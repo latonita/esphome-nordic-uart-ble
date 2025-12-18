@@ -73,6 +73,7 @@ class UARTNordicComponent : public uart::UARTComponent, public ble_client::BLECl
   void handle_state_();
   void send_next_chunk_in_ble_();
   void defer_in_ble_(const std::function<void()> &fn);
+  void watchdog_();
   bool discover_characteristics_();
   FsmState state_{FsmState::IDLE};
   FsmState last_reported_state_{FsmState::IDLE};
@@ -80,6 +81,7 @@ class UARTNordicComponent : public uart::UARTComponent, public ble_client::BLECl
   bool auth_completed_{false};
   bool discovered_chars_{false};
   bool notifications_enabled_{false};
+  bool notification_subscribing_{false};
 
   uint16_t mtu_{23};
   uint16_t desired_mtu_{247};
@@ -111,6 +113,9 @@ class UARTNordicComponent : public uart::UARTComponent, public ble_client::BLECl
 
   uint32_t last_activity_ms_{0};
   uint32_t reconnect_backoff_ms_{0};
+
+  uint32_t state_enter_ms_{0};
+  uint32_t state_timeout_ms_{5000};
 
   espbt::ESPBTUUID service_uuid_;
   espbt::ESPBTUUID tx_uuid_;

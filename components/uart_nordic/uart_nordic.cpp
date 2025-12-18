@@ -55,6 +55,7 @@ bool UARTNordicComponent::connect() {
   this->auth_completed_ = false;
   this->discovered_chars_ = false;
   this->notifications_enabled_ = false;
+  this->notification_subscribing_ = false;
   this->chr_rx_handle_ = 0;
   this->chr_tx_handle_ = 0;
   this->chr_cccd_handle_ = 0;
@@ -185,13 +186,13 @@ void UARTNordicComponent::flush() {
 }
 
 void UARTNordicComponent::set_state_(FsmState state) {
-  ESP_LOGV(TAG, "FSM state: %s -> %s", LOG_STR_ARG(this->state_to_string(this->state_)),
-           LOG_STR_ARG(this->state_to_string(state)));
+  ESP_LOGV(TAG, "FSM state: %s", LOG_STR_ARG(this->state_to_string(state)));
   this->state_ = state;
+  this->state_enter_ms_ = millis();
 }
 
 void UARTNordicComponent::send_next_chunk_in_ble_() {
-  if (this->state_ != FsmState::UART_LINK_ESTABLISHED || this->tx_buffer_ == nullptr || this->chr_tx_handle_ == 0) {
+  if (this->state_ != FsmState::UART_LINK_ESTABLISHED || this->tx_buffer_ == nullptr || this->chr_rx_handle_ == 0) {
     this->tx_in_progress_ = false;
     return;
   }
@@ -211,7 +212,7 @@ void UARTNordicComponent::send_next_chunk_in_ble_() {
   }
 
   esp_err_t err = esp_ble_gattc_write_char(this->parent_->get_gattc_if(), this->parent_->get_conn_id(),
-                                           this->chr_tx_handle_, pulled, chunk.data(), ESP_GATT_WRITE_TYPE_RSP,
+                                           this->chr_rx_handle_, pulled, chunk.data(), ESP_GATT_WRITE_TYPE_RSP,
                                            ESP_GATT_AUTH_REQ_NONE);
   if (err != ESP_OK) {
     ESP_LOGW(TAG, "Failed to write TX characteristic: %d", err);
@@ -226,11 +227,34 @@ void UARTNordicComponent::defer_in_ble_(const std::function<void()> &fn) {
   }
 }
 
+void UARTNordicComponent::watchdog_() {
+  switch (this->state_) {
+    case FsmState::CONNECTING:
+    case FsmState::DISCOVERING:
+    case FsmState::ENABLING_NOTIF:
+    case FsmState::DISCONNECTING:
+    case FsmState::ERROR:
+      if (millis() - this->state_enter_ms_ > this->state_timeout_ms_) {
+        ESP_LOGW(TAG, "State %s timed out, resetting to IDLE",
+                 LOG_STR_ARG(this->state_to_string(this->state_)));
+        if (this->parent_ != nullptr) {
+          this->parent_->disconnect();
+        }
+        this->set_state_(FsmState::IDLE);
+      }
+      break;
+    default:
+      break;
+  }
+}
+
 void UARTNordicComponent::handle_state_() {
   if (this->state_ != this->last_reported_state_) {
     ESP_LOGV(TAG, "FSM state: %s", LOG_STR_ARG(this->state_to_string(this->state_)));
     this->last_reported_state_ = this->state_;
   }
+
+  this->watchdog_();
 
   switch (this->state_) {
     case FsmState::IDLE:
@@ -273,7 +297,7 @@ bool UARTNordicComponent::discover_characteristics_() {
   this->chr_rx_handle_ = chr_rx->handle;
   this->chr_tx_handle_ = chr_tx->handle;
 
-  auto desc = this->parent_->get_descriptor(this->service_uuid_, this->rx_uuid_,
+  auto desc = this->parent_->get_descriptor(this->service_uuid_, this->tx_uuid_,
                                             espbt::ESPBTUUID::from_uint16(ESP_GATT_UUID_CHAR_CLIENT_CONFIG));
   if (desc != nullptr) {
     this->chr_cccd_handle_ = desc->handle;
@@ -317,16 +341,21 @@ void UARTNordicComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_ga
       if (param->search_cmpl.conn_id != this->parent_->get_conn_id())
         break;
 
+      if (this->notifications_enabled_ || this->notification_subscribing_) {
+        ESP_LOGV(TAG, "Notification setup already in progress/enabled, skipping re-subscription");
+        break;
+      }
+
       if (!this->discover_characteristics_()) {
         this->set_state_(FsmState::ERROR);
         this->parent_->disconnect();
         break;
       }
 
-      // register for notify on RX handle
-      if (this->chr_rx_handle_ != 0) {
+      // register for notify on TX characteristic (NUS TX -> notifications)
+      if (this->chr_tx_handle_ != 0) {
         auto status = esp_ble_gattc_register_for_notify(this->parent_->get_gattc_if(), this->parent_->get_remote_bda(),
-                                                        this->chr_rx_handle_);
+                                                        this->chr_tx_handle_);
         if (status != ESP_OK) {
           ESP_LOGW(TAG, "Register for notify failed: %d", status);
         }
@@ -343,6 +372,7 @@ void UARTNordicComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_ga
           this->set_state_(FsmState::ERROR);
           return;
         }
+        this->notification_subscribing_ = true;
       }
 
       this->set_state_(FsmState::ENABLING_NOTIF);
@@ -359,6 +389,7 @@ void UARTNordicComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_ga
         break;
       if (param->write.status == ESP_GATT_OK && param->write.handle == this->chr_cccd_handle_) {
         this->notifications_enabled_ = true;
+        this->notification_subscribing_ = false;
         ESP_LOGI(TAG, "Notifications enabled (CCCD write ok)");
       } else {
         ESP_LOGW(TAG, "CCCD write failed: status=%d", param->write.status);
