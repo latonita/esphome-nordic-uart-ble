@@ -8,7 +8,7 @@ A UART-compatible transport over BLE Nordic UART Service. Presents UART-like API
 - `CONNECTING`
 - `DISCOVERING`
 - `ENABLING_NOTIF`
-- `LINK_ESTABLISHED`
+- `UART_LINK_ESTABLISHED`
 - `DISCONNECTING`
 - `ERROR`
 
@@ -22,6 +22,8 @@ Transitions will be driven by BLE events (connect/discover/CCCD/MTU/notify) once
 - `connect()` / `disconnect()`
 - `is_connected()`
 - UART interface: `write_array`, `read_array`, `peek_byte`, `available`, `flush`
+- Triggers: `on_connected`, `on_disconnected`
+- Actions: `uart_nordic.connect`, `uart_nordic.disconnect`
 
 ## Config (Python)
 Validated UUIDs and PIN:
@@ -29,6 +31,8 @@ Validated UUIDs and PIN:
 - `rx_uuid`
 - `tx_uuid`
 - `pin` (0-999999)
+- `mtu` (default 247)
+- `on_connected`, `on_disconnected` automations
 
 ## Status
 Link management, BLE discovery, notifications, and TX/RX over BLE are not implemented yet. Skeleton is in place for future work.
