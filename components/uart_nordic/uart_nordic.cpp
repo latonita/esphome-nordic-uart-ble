@@ -55,7 +55,7 @@ bool UARTNordicComponent::connect() {
   this->auth_completed_ = false;
   this->discovered_chars_ = false;
   this->notifications_enabled_ = false;
-  this->notification_subscribing_ = false;
+  this->services_discovered_ = false;
   this->chr_rx_handle_ = 0;
   this->chr_tx_handle_ = 0;
   this->chr_cccd_handle_ = 0;
@@ -341,8 +341,13 @@ void UARTNordicComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_ga
       if (param->search_cmpl.conn_id != this->parent_->get_conn_id())
         break;
 
-      if (this->notifications_enabled_ || this->notification_subscribing_) {
-        ESP_LOGV(TAG, "Notification setup already in progress/enabled, skipping re-subscription");
+      if (this->services_discovered_) {
+        ESP_LOGV(TAG, "Services already processed, ignoring duplicate SEARCH_CMPL");
+        break;
+      }
+
+      if (this->notifications_enabled_) {
+        ESP_LOGV(TAG, "Notifications already enabled, skipping re-subscription");
         break;
       }
 
@@ -361,21 +366,8 @@ void UARTNordicComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_ga
         }
       }
 
-      if (this->chr_cccd_handle_ != 0) {
-        uint16_t notify_en = 0x0001;
-        auto err = esp_ble_gattc_write_char_descr(this->parent_->get_gattc_if(), this->parent_->get_conn_id(),
-                                                  this->chr_cccd_handle_, sizeof(notify_en),
-                                                  reinterpret_cast<uint8_t *>(&notify_en), ESP_GATT_WRITE_TYPE_RSP,
-                                                  ESP_GATT_AUTH_REQ_NONE);
-        if (err != ESP_OK) {
-          ESP_LOGW(TAG, "Failed to enable notifications on handle 0x%04X: %d", this->chr_cccd_handle_, err);
-          this->set_state_(FsmState::ERROR);
-          return;
-        }
-        this->notification_subscribing_ = true;
-      }
-
       this->set_state_(FsmState::ENABLING_NOTIF);
+      this->services_discovered_ = true;
       break;
     }
     case ESP_GATTC_DISCONNECT_EVT: {
@@ -389,7 +381,6 @@ void UARTNordicComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_ga
         break;
       if (param->write.status == ESP_GATT_OK && param->write.handle == this->chr_cccd_handle_) {
         this->notifications_enabled_ = true;
-        this->notification_subscribing_ = false;
         ESP_LOGI(TAG, "Notifications enabled (CCCD write ok)");
       } else {
         ESP_LOGW(TAG, "CCCD write failed: status=%d", param->write.status);

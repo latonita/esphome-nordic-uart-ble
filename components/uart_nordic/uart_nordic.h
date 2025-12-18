@@ -81,7 +81,7 @@ class UARTNordicComponent : public uart::UARTComponent, public ble_client::BLECl
   bool auth_completed_{false};
   bool discovered_chars_{false};
   bool notifications_enabled_{false};
-  bool notification_subscribing_{false};
+  bool services_discovered_{false};
 
   uint16_t mtu_{23};
   uint16_t desired_mtu_{247};
