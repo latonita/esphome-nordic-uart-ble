@@ -35,7 +35,7 @@ class UARTNordicComponent : public uart::UARTComponent, public ble_client::BLECl
   void loop() override;
   void dump_config() override;
   float get_setup_priority() const override { return setup_priority::AFTER_BLUETOOTH; };
-  
+
   // BLE control
   bool connect();
   bool is_connected() const { return this->state_ == FsmState::UART_LINK_ESTABLISHED; }
@@ -58,15 +58,14 @@ class UARTNordicComponent : public uart::UARTComponent, public ble_client::BLECl
   void check_logger_conflict() override {}
 
   void set_service_uuid(const char *uuid) { this->service_uuid_ = espbt::ESPBTUUID::from_raw(uuid); }
-  void set_tx_uuid(const char *uuid) { this->tx_uuid_ = espbt::ESPBTUUID::from_raw(uuid); }
-  void set_rx_uuid(const char *uuid) { this->rx_uuid_ = espbt::ESPBTUUID::from_raw(uuid); }
+  void set_rx_uuid(const char *uuid) { this->rx_uuid_for_commands_ = espbt::ESPBTUUID::from_raw(uuid); }
+  void set_tx_uuid(const char *uuid) { this->tx_uuid_for_responses_ = espbt::ESPBTUUID::from_raw(uuid); }
   void set_passkey(uint32_t pin) { this->passkey_ = pin % 1000000U; }
   void set_mtu(uint16_t mtu) { this->desired_mtu_ = mtu; }
   void set_flush_timeout(uint32_t timeout_ms) { this->tx_flush_timeout_ms_ = timeout_ms; }
 
   Trigger<> *get_on_connected_trigger() { return &this->on_connected_; }
   Trigger<> *get_on_disconnected_trigger() { return &this->on_disconnected_; }
-
 
  protected:
   void set_state_(FsmState state);
@@ -91,8 +90,8 @@ class UARTNordicComponent : public uart::UARTComponent, public ble_client::BLECl
   Trigger<> on_connected_;
   Trigger<> on_disconnected_;
 
-  uint16_t chr_rx_handle_{0};
-  uint16_t chr_tx_handle_{0};
+  uint16_t chr_commands_handle_{0};
+  uint16_t chr_responses_handle_{0};
   uint16_t chr_cccd_handle_{0};
 
   static constexpr size_t RX_BUFFER_CAPACITY = 512;
@@ -118,9 +117,10 @@ class UARTNordicComponent : public uart::UARTComponent, public ble_client::BLECl
   uint32_t state_timeout_ms_{5000};
 
   espbt::ESPBTUUID service_uuid_;
-  espbt::ESPBTUUID tx_uuid_;
-  espbt::ESPBTUUID rx_uuid_;
+  espbt::ESPBTUUID rx_uuid_for_commands_;
+  espbt::ESPBTUUID tx_uuid_for_responses_;
   uint32_t passkey_{0};
+  int8_t rssi_{0};
 };
 
 class UARTNordicConnectAction : public Action<> {

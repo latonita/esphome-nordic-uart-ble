@@ -56,8 +56,8 @@ bool UARTNordicComponent::connect() {
   this->discovered_chars_ = false;
   this->notifications_enabled_ = false;
   this->services_discovered_ = false;
-  this->chr_rx_handle_ = 0;
-  this->chr_tx_handle_ = 0;
+  this->chr_commands_handle_ = 0;
+  this->chr_responses_handle_ = 0;
   this->chr_cccd_handle_ = 0;
 
   // MTU
@@ -186,20 +186,26 @@ void UARTNordicComponent::flush() {
 }
 
 void UARTNordicComponent::set_state_(FsmState state) {
-  ESP_LOGV(TAG, "FSM state: %s", LOG_STR_ARG(this->state_to_string(state)));
-  this->state_ = state;
+  if (this->state_ != state) {
+    ESP_LOGV(TAG, "FSM state: %s -> %s", LOG_STR_ARG(this->state_to_string(this->state_)),
+             LOG_STR_ARG(this->state_to_string(state)));
+    this->state_ = state;
+  }
   this->state_enter_ms_ = millis();
 }
 
 void UARTNordicComponent::send_next_chunk_in_ble_() {
-  if (this->state_ != FsmState::UART_LINK_ESTABLISHED || this->tx_buffer_ == nullptr || this->chr_rx_handle_ == 0) {
+  if (this->state_ != FsmState::UART_LINK_ESTABLISHED || this->tx_buffer_ == nullptr ||
+      this->chr_commands_handle_ == 0) {
     this->tx_in_progress_ = false;
+    ESP_LOGV(TAG, "send_next_chunk_in_ble_ , safeguard finish");
     return;
   }
 
   size_t pending = this->tx_buffer_->available();
   if (pending == 0) {
     this->tx_in_progress_ = false;
+    ESP_LOGV(TAG, "send_next_chunk_in_ble_ , no more data to send");
     return;
   }
 
@@ -211,9 +217,10 @@ void UARTNordicComponent::send_next_chunk_in_ble_() {
     return;
   }
 
-  esp_err_t err = esp_ble_gattc_write_char(this->parent_->get_gattc_if(), this->parent_->get_conn_id(),
-                                           this->chr_rx_handle_, pulled, chunk.data(), ESP_GATT_WRITE_TYPE_RSP,
-                                           ESP_GATT_AUTH_REQ_NONE);
+  esp_err_t err =
+      esp_ble_gattc_write_char(this->parent_->get_gattc_if(), this->parent_->get_conn_id(), this->chr_commands_handle_,
+                               pulled, chunk.data(), ESP_GATT_WRITE_TYPE_RSP, ESP_GATT_AUTH_REQ_NONE);
+  ESP_LOGVV(TAG, "TX: %s", format_hex_pretty(chunk.data(), pulled).c_str());
   if (err != ESP_OK) {
     ESP_LOGW(TAG, "Failed to write TX characteristic: %d", err);
     this->tx_in_progress_ = false;
@@ -235,8 +242,7 @@ void UARTNordicComponent::watchdog_() {
     case FsmState::DISCONNECTING:
     case FsmState::ERROR:
       if (millis() - this->state_enter_ms_ > this->state_timeout_ms_) {
-        ESP_LOGW(TAG, "State %s timed out, resetting to IDLE",
-                 LOG_STR_ARG(this->state_to_string(this->state_)));
+        ESP_LOGW(TAG, "State %s timed out, resetting to IDLE", LOG_STR_ARG(this->state_to_string(this->state_)));
         if (this->parent_ != nullptr) {
           this->parent_->disconnect();
         }
@@ -285,39 +291,49 @@ void UARTNordicComponent::handle_state_() {
 }
 
 bool UARTNordicComponent::discover_characteristics_() {
-  auto chr_rx = this->parent_->get_characteristic(this->service_uuid_, this->rx_uuid_);
-  auto chr_tx = this->parent_->get_characteristic(this->service_uuid_, this->tx_uuid_);
+  auto chr_commands = this->parent_->get_characteristic(this->service_uuid_, this->rx_uuid_for_commands_);
+  auto chr_responses = this->parent_->get_characteristic(this->service_uuid_, this->tx_uuid_for_responses_);
 
-  if (chr_rx == nullptr || chr_tx == nullptr) {
+  if (chr_commands == nullptr || chr_responses == nullptr) {
     ESP_LOGW(TAG, "Required characteristics not found");
     return false;
   }
 
-  this->discovered_chars_ = true;
-  this->chr_rx_handle_ = chr_rx->handle;
-  this->chr_tx_handle_ = chr_tx->handle;
+  this->chr_commands_handle_ = chr_commands->handle;
+  this->chr_responses_handle_ = chr_responses->handle;
 
-  auto desc = this->parent_->get_descriptor(this->service_uuid_, this->tx_uuid_,
-                                            espbt::ESPBTUUID::from_uint16(ESP_GATT_UUID_CHAR_CLIENT_CONFIG));
-  if (desc != nullptr) {
-    this->chr_cccd_handle_ = desc->handle;
+  auto desc = this->parent_->get_config_descriptor(this->chr_responses_handle_);
+
+  // auto desc = this->parent_->get_descriptor(this->service_uuid_, this->tx_uuid_,
+  //                                           espbt::ESPBTUUID::from_uint16(ESP_GATT_UUID_CHAR_CLIENT_CONFIG));
+  if (desc == nullptr) {
+    ESP_LOGW(TAG, "No CCCD descriptor found for TX characteristic");
+    return false;
   }
+  this->chr_cccd_handle_ = desc->handle;
 
+  this->discovered_chars_ = true;
   return true;
 }
 
 void UARTNordicComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if,
                                               esp_ble_gattc_cb_param_t *param) {
+  
   if (this->parent_ == nullptr) {
+    ESP_LOGV(TAG, "gattc_event_handler called but no parent");
     return;
   }
-  if (event == ESP_GATTC_OPEN_EVT) {
-    if (!this->parent_->check_addr(param->open.remote_bda))
-      return;
-  } else {
-    if (param->cfg_mtu.conn_id != 0 && param->cfg_mtu.conn_id != this->parent_->get_conn_id() && event != ESP_GATTC_DISCONNECT_EVT)
-      return;
-  }
+
+  ESP_LOGI(TAG, "GATTC event: %d", event);
+  
+  // if (event == ESP_GATTC_OPEN_EVT) {
+  //   if (!this->parent_->check_addr(param->open.remote_bda))
+  //     return;
+  // } else {
+  //   if (param->cfg_mtu.conn_id != 0 && param->cfg_mtu.conn_id != this->parent_->get_conn_id() &&
+  //       event != ESP_GATTC_DISCONNECT_EVT)
+  //     return;
+  // }
   switch (event) {
     case ESP_GATTC_OPEN_EVT: {
       if (param->open.status == ESP_GATT_OK) {
@@ -326,8 +342,7 @@ void UARTNordicComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_ga
         ESP_LOGW(TAG, "GATTC open failed: %d", param->open.status);
         this->set_state_(FsmState::ERROR);
       }
-      break;
-    }
+    } break;
     case ESP_GATTC_CFG_MTU_EVT: {
       if (param->cfg_mtu.status == ESP_GATT_OK) {
         this->mtu_ = param->cfg_mtu.mtu;
@@ -335,8 +350,7 @@ void UARTNordicComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_ga
       } else {
         ESP_LOGW(TAG, "MTU config failed: %d", param->cfg_mtu.status);
       }
-      break;
-    }
+    } break;
     case ESP_GATTC_SEARCH_CMPL_EVT: {
       if (param->search_cmpl.conn_id != this->parent_->get_conn_id())
         break;
@@ -358,47 +372,68 @@ void UARTNordicComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_ga
       }
 
       // register for notify on TX characteristic (NUS TX -> notifications)
-      if (this->chr_tx_handle_ != 0) {
+      if (this->chr_responses_handle_ != 0) {
         auto status = esp_ble_gattc_register_for_notify(this->parent_->get_gattc_if(), this->parent_->get_remote_bda(),
-                                                        this->chr_tx_handle_);
+                                                        this->chr_responses_handle_);
         if (status != ESP_OK) {
           ESP_LOGW(TAG, "Register for notify failed: %d", status);
         }
       }
 
-      this->set_state_(FsmState::ENABLING_NOTIF);
       this->services_discovered_ = true;
-      break;
-    }
-    case ESP_GATTC_DISCONNECT_EVT: {
-      ESP_LOGI(TAG, "GATTC disconnected, reason=0x%02X", param->disconnect.reason);
-      this->set_state_(FsmState::IDLE);
-      this->on_disconnected_.trigger();
-      break;
-    }
+
+      uint16_t notify_en = 0x0001;
+      auto err = esp_ble_gattc_write_char_descr(this->parent_->get_gattc_if(), this->parent_->get_conn_id(),
+                                                this->chr_cccd_handle_, sizeof(notify_en), (uint8_t *) &notify_en,
+                                                ESP_GATT_WRITE_TYPE_RSP, ESP_GATT_AUTH_REQ_NONE);
+
+      if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to enable notifications on handle 0x%04X: %d", this->chr_cccd_handle_, err);
+        this->set_state_(FsmState::ERROR);
+        return;
+      }
+
+      this->set_state_(FsmState::ENABLING_NOTIF);
+    } break;
+
     case ESP_GATTC_WRITE_DESCR_EVT: {
       if (param->write.conn_id != this->parent_->get_conn_id())
         break;
-      if (param->write.status == ESP_GATT_OK && param->write.handle == this->chr_cccd_handle_) {
-        this->notifications_enabled_ = true;
-        ESP_LOGI(TAG, "Notifications enabled (CCCD write ok)");
+      if (param->write.status == ESP_GATT_OK) {
+        if (param->write.handle == this->chr_cccd_handle_) {
+          this->notifications_enabled_ = true;
+          ESP_LOGI(TAG, "Notifications enabled (CCCD write ok)");
+        } else {
+          ESP_LOGI(TAG, "ESP_GATTC_WRITE_DESCR_EVT not for CCCD.. (handle = %u)", param->write.handle);
+        }
       } else {
         ESP_LOGW(TAG, "CCCD write failed: status=%d", param->write.status);
+        this->set_state_(FsmState::ERROR);
       }
-      break;
-    }
+    } break;
+
     case ESP_GATTC_WRITE_CHAR_EVT: {
       if (param->write.conn_id != this->parent_->get_conn_id())
         break;
       if (param->write.status == ESP_GATT_OK) {
-        this->defer_in_ble_([this]() { this->send_next_chunk_in_ble_(); });
+        size_t pending = this->tx_buffer_->available();
+        if (pending == 0) {
+          this->tx_in_progress_ = false;
+          ESP_LOGV(TAG, "TX completed: no more data to send");
+          return;
+        } else {
+          // we are already in BLE thread, no need to defer next portion
+          this->send_next_chunk_in_ble_();
+          // we probably need to wait to read reply first, then send next 
+        }
       } else {
         ESP_LOGW(TAG, "TX write failed: status=%d", param->write.status);
         this->tx_in_progress_ = false;
       }
-      break;
-    }
+    } break;
     case ESP_GATTC_NOTIFY_EVT: {
+      ESP_LOGV(TAG, "Notification received (handle = 0x%04X, value_len = %d, conn_id = %d, our conn_id = %d)", 
+        param->notify.handle, param->notify.value_len, param->notify.conn_id, this->parent_->get_conn_id());
       if (param->notify.conn_id != this->parent_->get_conn_id())
         break;
 
@@ -412,14 +447,20 @@ void UARTNordicComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_ga
         break;
       }
 
+      ESP_LOGVV(TAG, "RX: %s", format_hex_pretty(param->notify.value, param->notify.value_len).c_str());
+
       if (this->rx_buffer_ != nullptr) {
         size_t written = this->rx_buffer_->write(param->notify.value, param->notify.value_len);
         if (written < param->notify.value_len) {
           ESP_LOGW(TAG, "RX buffer overflow, dropped %d bytes", param->notify.value_len - (int) written);
         }
       }
-      break;
-    }
+    } break;
+    case ESP_GATTC_DISCONNECT_EVT: {
+      ESP_LOGI(TAG, "GATTC disconnected, reason=0x%02X", param->disconnect.reason);
+      this->set_state_(FsmState::IDLE);
+      this->on_disconnected_.trigger();
+    } break;
     default:
       break;
   }
@@ -428,11 +469,28 @@ void UARTNordicComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_ga
 void UARTNordicComponent::gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) {
   switch (event) {
     case ESP_GAP_BLE_PASSKEY_REQ_EVT: {
+      if (!this->parent_->check_addr(param->ble_security.ble_req.bd_addr)) {
+        break;
+      }
       ESP_LOGV(TAG, "Supplying PIN %06u", this->passkey_);
       esp_ble_passkey_reply(param->ble_security.ble_req.bd_addr, true, this->passkey_);
       break;
     }
+    case ESP_GAP_BLE_SEC_REQ_EVT: {
+      if (!this->parent_->check_addr(param->ble_security.ble_req.bd_addr)) {
+        break;
+      }
+      auto auth_cmpl = param->ble_security.auth_cmpl;
+      ESP_LOGV(TAG, "ESP_GAP_BLE_SEC_REQ_EVT success: %d, fail reason: %d, auth mode: %d", auth_cmpl.success,
+               auth_cmpl.fail_reason, auth_cmpl.auth_mode);
+      esp_err_t sec_rsp = esp_ble_gap_security_rsp(param->ble_security.ble_req.bd_addr, true);
+      ESP_LOGV(TAG, "esp_ble_gap_security_rsp result: %d", sec_rsp);
+    } break;
+
     case ESP_GAP_BLE_AUTH_CMPL_EVT: {
+      if (!this->parent_->check_addr(param->ble_security.auth_cmpl.bd_addr)) {
+        break;
+      }
       if (param->ble_security.auth_cmpl.success) {
         ESP_LOGI(TAG, "Pairing completed (auth mode %d)", param->ble_security.auth_cmpl.auth_mode);
         this->auth_completed_ = true;
@@ -442,6 +500,10 @@ void UARTNordicComponent::gap_event_handler(esp_gap_ble_cb_event_t event, esp_bl
       break;
     }
     case ESP_GAP_BLE_READ_RSSI_COMPLETE_EVT: {
+      if (!this->parent_->check_addr(param->read_rssi_cmpl.remote_addr)) {
+        break;
+      }
+      this->rssi_ = param->read_rssi_cmpl.rssi;
       if (this->ble_defer_fn_ != nullptr) {
         auto fn = this->ble_defer_fn_;
         this->ble_defer_fn_ = nullptr;
