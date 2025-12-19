@@ -50,6 +50,8 @@ class UARTNordicComponent : public uart::UARTComponent, public ble_client::BLECl
 
   // uart::UARTComponent interface
   void write_array(const uint8_t *data, size_t len) override;
+  void write_byte(uint8_t data);
+  bool read_byte(uint8_t *data);
   bool peek_byte(uint8_t *data) override;
   bool read_array(uint8_t *data, size_t len) override;
   int available() override;

@@ -114,6 +114,10 @@ void UARTNordicComponent::write_array(const uint8_t *data, size_t len) {
   }
 }
 
+void UARTNordicComponent::write_byte(uint8_t data) { this->write_array(&data, 1); }
+
+bool UARTNordicComponent::read_byte(uint8_t *data) { return this->read_array(data, 1); }
+
 bool UARTNordicComponent::peek_byte(uint8_t *data) {
   if (this->peek_valid_) {
     if (data != nullptr) {
