@@ -56,6 +56,8 @@ bool UARTNordicComponent::connect() {
   this->discovered_chars_ = false;
   this->notifications_enabled_ = false;
   this->services_discovered_ = false;
+  this->last_activity_ms_ = millis();
+  this->last_autoconnect_attempt_ms_ = 0;
   this->chr_commands_handle_ = 0;
   this->chr_responses_handle_ = 0;
   this->chr_cccd_handle_ = 0;
@@ -104,6 +106,11 @@ void UARTNordicComponent::write_array(const uint8_t *data, size_t len) {
   if (data == nullptr || len == 0 || this->tx_buffer_ == nullptr) {
     return;
   }
+  if (this->state_ != FsmState::UART_LINK_ESTABLISHED) {
+    this->maybe_autoconnect_();
+    return;
+  }
+  this->last_activity_ms_ = millis();
   size_t written = this->tx_buffer_->write_without_replacement(data, len, 0, true);
   if (written < len) {
     ESP_LOGW(TAG, "TX buffer overflow, dropped %zu bytes", len - written);
@@ -119,10 +126,14 @@ void UARTNordicComponent::write_byte(uint8_t data) { this->write_array(&data, 1)
 bool UARTNordicComponent::read_byte(uint8_t *data) { return this->read_array(data, 1); }
 
 bool UARTNordicComponent::peek_byte(uint8_t *data) {
+  if (this->state_ != FsmState::UART_LINK_ESTABLISHED) {
+    this->maybe_autoconnect_();
+  }
   if (this->peek_valid_) {
     if (data != nullptr) {
       *data = this->peek_byte_;
     }
+    this->last_activity_ms_ = millis();
     return true;
   }
 
@@ -139,10 +150,14 @@ bool UARTNordicComponent::peek_byte(uint8_t *data) {
   if (data != nullptr) {
     *data = tmp;
   }
+  this->last_activity_ms_ = millis();
   return true;
 }
 
 bool UARTNordicComponent::read_array(uint8_t *data, size_t len) {
+  if (this->state_ != FsmState::UART_LINK_ESTABLISHED) {
+    this->maybe_autoconnect_();
+  }
   if (data == nullptr || len == 0) {
     return true;
   }
@@ -166,10 +181,17 @@ bool UARTNordicComponent::read_array(uint8_t *data, size_t len) {
   }
 
   size_t read = this->rx_buffer_->read(data + offset, remaining, 0);
-  return read == remaining;
+  if (read == remaining) {
+    this->last_activity_ms_ = millis();
+    return true;
+  }
+  return false;
 }
 
 int UARTNordicComponent::available() {
+  if (this->state_ != FsmState::UART_LINK_ESTABLISHED) {
+    this->maybe_autoconnect_();
+  }
   if (this->rx_buffer_ == nullptr) {
     return 0;
   }
@@ -177,6 +199,9 @@ int UARTNordicComponent::available() {
 }
 
 void UARTNordicComponent::flush() {
+  if (this->state_ != FsmState::UART_LINK_ESTABLISHED) {
+    this->maybe_autoconnect_();
+  }
   const uint32_t start = millis();
   while (this->tx_in_progress_ || (this->tx_buffer_ != nullptr && this->tx_buffer_->available() > 0)) {
     if (millis() - start > this->tx_flush_timeout_ms_) {
@@ -213,6 +238,8 @@ void UARTNordicComponent::send_next_chunk_in_ble_() {
     return;
   }
 
+  this->last_activity_ms_ = millis();
+
   size_t max_payload = this->mtu_ > 3 ? (this->mtu_ - 3) : 20;
   std::vector<uint8_t> chunk(std::min(pending, max_payload));
   size_t pulled = this->tx_buffer_->read(chunk.data(), chunk.size(), 0);
@@ -229,6 +256,24 @@ void UARTNordicComponent::send_next_chunk_in_ble_() {
     ESP_LOGW(TAG, "Failed to write TX characteristic: %d", err);
     this->tx_in_progress_ = false;
   }
+}
+
+bool UARTNordicComponent::maybe_autoconnect_() {
+  if (!this->autoconnect_on_access_) {
+    return false;
+  }
+  if (this->state_ == FsmState::UART_LINK_ESTABLISHED || this->state_ == FsmState::CONNECTING ||
+      this->state_ == FsmState::DISCOVERING || this->state_ == FsmState::ENABLING_NOTIF) {
+    return false;
+  }
+  uint32_t now = millis();
+  if (now - this->last_autoconnect_attempt_ms_ < 1000) {
+    return false;
+  }
+  this->last_autoconnect_attempt_ms_ = now;
+  ESP_LOGV(TAG, "Auto-connect on access requested");
+  this->connect();
+  return true;
 }
 
 void UARTNordicComponent::defer_in_ble_(const std::function<void()> &fn) {
@@ -280,10 +325,15 @@ void UARTNordicComponent::handle_state_() {
       if (this->auth_completed_ && this->discovered_chars_ && this->notifications_enabled_) {
         this->set_state_(FsmState::UART_LINK_ESTABLISHED);
         this->on_connected_.trigger();
+        this->last_activity_ms_ = millis();
       }
       break;
     case FsmState::UART_LINK_ESTABLISHED:
-      // TODO: process RX/TX in ready state
+      if (this->idle_disconnect_timeout_ms_ > 0 &&
+          millis() - this->last_activity_ms_ > this->idle_disconnect_timeout_ms_) {
+        ESP_LOGI(TAG, "Idle timeout reached, disconnecting BLE");
+        this->disconnect();
+      }
       break;
     case FsmState::DISCONNECTING:
       // TODO: clean up and return to IDLE
@@ -426,6 +476,7 @@ void UARTNordicComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_ga
           ESP_LOGV(TAG, "TX completed: no more data to send");
           return;
         } else {
+          this->last_activity_ms_ = millis();
           // we are already in BLE thread, no need to defer next portion
           this->send_next_chunk_in_ble_();
           // we probably need to wait to read reply first, then send next 
@@ -458,6 +509,7 @@ void UARTNordicComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_ga
         if (written < param->notify.value_len) {
           ESP_LOGW(TAG, "RX buffer overflow, dropped %d bytes", param->notify.value_len - (int) written);
         }
+        this->last_activity_ms_ = millis();
       }
     } break;
     case ESP_GATTC_DISCONNECT_EVT: {

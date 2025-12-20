@@ -65,6 +65,8 @@ class UARTNordicComponent : public uart::UARTComponent, public ble_client::BLECl
   void set_passkey(uint32_t pin) { this->passkey_ = pin % 1000000U; }
   void set_mtu(uint16_t mtu) { this->desired_mtu_ = mtu; }
   void set_flush_timeout(uint32_t timeout_ms) { this->tx_flush_timeout_ms_ = timeout_ms; }
+  void set_idle_disconnect_timeout(uint32_t timeout_ms) { this->idle_disconnect_timeout_ms_ = timeout_ms; }
+  void set_autoconnect_on_access(bool enabled) { this->autoconnect_on_access_ = enabled; }
 
   Trigger<> *get_on_connected_trigger() { return &this->on_connected_; }
   Trigger<> *get_on_disconnected_trigger() { return &this->on_disconnected_; }
@@ -75,6 +77,7 @@ class UARTNordicComponent : public uart::UARTComponent, public ble_client::BLECl
   void send_next_chunk_in_ble_();
   void defer_in_ble_(const std::function<void()> &fn);
   void watchdog_();
+  bool maybe_autoconnect_();
   bool discover_characteristics_();
   FsmState state_{FsmState::IDLE};
   FsmState last_reported_state_{FsmState::IDLE};
@@ -113,6 +116,9 @@ class UARTNordicComponent : public uart::UARTComponent, public ble_client::BLECl
   int last_error_{0};
 
   uint32_t last_activity_ms_{0};
+  uint32_t idle_disconnect_timeout_ms_{0};
+  bool autoconnect_on_access_{false};
+  uint32_t last_autoconnect_attempt_ms_{0};
   uint32_t reconnect_backoff_ms_{0};
 
   uint32_t state_enter_ms_{0};

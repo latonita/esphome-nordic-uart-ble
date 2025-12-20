@@ -22,6 +22,7 @@ Transitions will be driven by BLE events (connect/discover/CCCD/MTU/notify) once
 - `connect()` / `disconnect()`
 - `is_connected()`
 - UART interface: `write_array`, `read_array`, `peek_byte`, `available`, `flush`
+- Optional: `autoconnect` (auto-connect when UART API is touched) and `idle_timeout` (auto-disconnect after inactivity)
 - Triggers: `on_connected`, `on_disconnected`
 - Actions: `uart_nordic.connect`, `uart_nordic.disconnect`
 

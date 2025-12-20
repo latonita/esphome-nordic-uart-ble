@@ -13,6 +13,8 @@ CONF_ON_CONNECTED = "on_connected"
 CONF_ON_DISCONNECTED = "on_disconnected"
 CONNECT_ACTION = "uart_nordic.connect"
 DISCONNECT_ACTION = "uart_nordic.disconnect"
+CONF_IDLE_TIMEOUT = "idle_timeout"
+CONF_AUTOCONNECT = "autoconnect"
 
 DEPENDENCIES = ["uart", "ble_client"]
 AUTO_LOAD = ["uart", "ble_client"]
@@ -49,6 +51,8 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_TX_UUID, default="6E400003-B5A3-F393-E0A9-E50E24DCCA9E"): _uuid_128,
         cv.Required(CONF_PIN): cv.int_range(min=0, max=999999),
         cv.Optional(CONF_MTU, default=247): cv.int_range(min=23, max=517),
+        cv.Optional(CONF_IDLE_TIMEOUT, default="0s"): cv.positive_time_period_milliseconds,
+        cv.Optional(CONF_AUTOCONNECT, default=False): cv.boolean,
         cv.Optional(CONF_ON_CONNECTED): automation.validate_automation(),
         cv.Optional(CONF_ON_DISCONNECTED): automation.validate_automation(),
     }
@@ -65,6 +69,8 @@ async def to_code(config):
     cg.add(var.set_tx_uuid(config[CONF_TX_UUID]))
     cg.add(var.set_passkey(config[CONF_PIN]))
     cg.add(var.set_mtu(config[CONF_MTU]))
+    cg.add(var.set_idle_disconnect_timeout(config[CONF_IDLE_TIMEOUT]))
+    cg.add(var.set_autoconnect_on_access(config[CONF_AUTOCONNECT]))
 
     if CONF_ON_CONNECTED in config:
         for conf in config[CONF_ON_CONNECTED]:
