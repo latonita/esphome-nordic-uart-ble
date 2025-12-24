@@ -8,6 +8,8 @@
 
 A drop-in UART-like transport over Bluetooth LE Nordic UART Service (NUS). It implements the usual UART surface (`write_array`, `read_array`, `peek_byte`, `available`, `flush`) plus explicit `connect()` / `disconnect()`, optional auto-connect, and an optional idle auto-disconnect. You can point existing UART-based components at this transport to replace a wired UART with BLE NUS without code changes in the consumer.
 
+Server part is under development yet.
+
 ## What is NUS (Nordic UART Service)?
 Nordic UART Service emulates a serial link over BLE using two characteristics: RX (writes from central to peripheral) and TX (notifications from peripheral to central). The central subscribes to TX notifications, and once that’s acknowledged it writes outbound data to RX. Each packet is limited by the GATT payload (often 20 bytes unless MTU negotiation raises it); the higher-level framing/interpretation is entirely application-specific.
 
@@ -48,8 +50,6 @@ some_component:
   uart_id: ble_uart
 ```
 
-## Nordic UART Server (coming soon)
-This repository also contains a skeleton `ble_nus_client_server` component intended to expose NUS as a BLE peripheral (ESP32 acts as the NUS server). It mirrors the client-facing options (UUIDs, PIN, MTU, idle timeout, auto-advertise) and will offer the same UART-like API plus advertising controls and connect/disconnect triggers. The current implementation is a stub ready to be wired into `esp32_ble` server APIs.
 
 ## YAML (stub)
 ```yaml
@@ -95,15 +95,13 @@ ble_nus_client:
 - **mtu** (Optional, int): Desired MTU, 23–517. Default `247`.
 - **idle_timeout** (Optional, time): Auto-disconnect after no RX/TX activity. `0s` disables (default).
 - **autoconnect** (Optional, bool): If `true`, any UART access while disconnected will trigger a BLE connect attempt (once per second max). Default `false`.
-- **on_connected** (Optional): Automation when BLE link is established.
-- **on_disconnected** (Optional): Automation when BLE link drops.
-- **on_sent** (Optional): Automation when transmission finished and confirmed by remote device.
-- **on_data** (Optional): Automation when any notification payload is received.
 - All other options from `ble_client`.
 
-## Triggers
+## Automations
 - `on_connected`: Fired when the BLE link reaches UART_LINK_ESTABLISHED.
 - `on_disconnected`: Fired when the BLE link closes.
+- `on_sent`: Fired when transmission finished and confirmed by remote device.
+- `on_data`: Fired when any notification payload is received.
 
 ## Actions
 - `ble_nus_client.connect`: Initiate a BLE connection.
@@ -125,11 +123,11 @@ ble_nus_client:
 
 button:
   - platform: template
-    name: "Nordic UART Connect"
+    name: "NUS Connect"
     on_press:
       - ble_nus_client.connect: ble_uart
   - platform: template
-    name: "Nordic UART Disconnect"
+    name: "NUS Disconnect"
     on_press:
       - ble_nus_client.disconnect: ble_uart
 ```
