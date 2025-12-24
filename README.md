@@ -4,7 +4,7 @@
 [Ленэлектро ЛЕ-2](https://github.com/latonita/esphome-le2-meter) • [Пульсар-М](https://github.com/latonita/esphome-pulsar-m) •
 [Энергомера BLE](https://github.com/latonita/esphome-energomera-ble)
 
-# ESPHome UART Nordic (BLE NUS)
+# ESPHome UART Nordic (BLE NUS) Client
 
 A drop-in UART-like transport over Bluetooth LE Nordic UART Service (NUS). It implements the usual UART surface (`write_array`, `read_array`, `peek_byte`, `available`, `flush`) plus explicit `connect()` / `disconnect()`, optional auto-connect, and an optional idle auto-disconnect. You can point existing UART-based components at this transport to replace a wired UART with BLE NUS without code changes in the consumer.
 
@@ -47,6 +47,9 @@ uart_nordic:
 some_component:
   uart_id: ble_uart
 ```
+
+## Nordic UART Server (coming soon)
+This repository also contains a skeleton `uart_nordic_server` component intended to expose NUS as a BLE peripheral (ESP32 acts as the NUS server). It mirrors the client-facing options (UUIDs, PIN, MTU, idle timeout, auto-advertise) and will offer the same UART-like API plus advertising controls and connect/disconnect triggers. The current implementation is a stub ready to be wired into `esp32_ble` server APIs.
 
 ## YAML (stub)
 ```yaml
@@ -94,6 +97,7 @@ uart_nordic:
 - **autoconnect** (Optional, bool): If `true`, any UART access while disconnected will trigger a BLE connect attempt (once per second max). Default `false`.
 - **on_connected** (Optional): Automation when BLE link is established.
 - **on_disconnected** (Optional): Automation when BLE link drops.
+- **on_tx_complete** (Optional): Automation when transmission finished and confirmed by remote device.
 - All other options from `ble_client`.
 
 ## Triggers
@@ -113,6 +117,8 @@ uart_nordic:
     - logger.log: "UART Nordic connected"
   on_disconnected:
     - logger.log: "UART Nordic disconnected"
+  on_tx_complete:
+    - logger.log: "Data Transmission Completed"
 
 button:
   - platform: template
