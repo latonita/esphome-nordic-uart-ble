@@ -12,21 +12,23 @@ CONF_TX_UUID = "tx_uuid"
 
 CONF_ON_CONNECTED = "on_connected"
 CONF_ON_DISCONNECTED = "on_disconnected"
+CONF_ON_SENT = "on_sent"
+CONF_ON_DATA = "on_data"
 
-START_ADVERTISING_ACTION = "uart_nordic_server.start_advertising"
-STOP_ADVERTISING_ACTION = "uart_nordic_server.stop_advertising"
-DISCONNECT_ACTION = "uart_nordic_server.disconnect"
+START_ADVERTISING_ACTION = "ble_nus_server.start_advertising"
+STOP_ADVERTISING_ACTION = "ble_nus_server.stop_advertising"
+DISCONNECT_ACTION = "ble_nus_server.disconnect"
 
 DEPENDENCIES = ["esp32_ble", "esp32_ble_server", "uart"]
 AUTO_LOAD = ["uart", "esp32_ble"]
 
-uart_nordic_server_ns = cg.esphome_ns.namespace("uart_nordic_server")
-UARTNordicServerComponent = uart_nordic_server_ns.class_(
-    "UARTNordicServerComponent", uart.UARTComponent, cg.Component
+ble_nus_server_ns = cg.esphome_ns.namespace("ble_nus_server")
+BLENUSServerComponent = ble_nus_server_ns.class_(
+    "BLENUSServerComponent", uart.UARTComponent, cg.Component
 )
-StartAdvertisingAction = uart_nordic_server_ns.class_("StartAdvertisingAction", automation.Action)
-StopAdvertisingAction = uart_nordic_server_ns.class_("StopAdvertisingAction", automation.Action)
-DisconnectAction = uart_nordic_server_ns.class_("DisconnectAction", automation.Action)
+StartAdvertisingAction = ble_nus_server_ns.class_("StartAdvertisingAction", automation.Action)
+StopAdvertisingAction = ble_nus_server_ns.class_("StopAdvertisingAction", automation.Action)
+DisconnectAction = ble_nus_server_ns.class_("DisconnectAction", automation.Action)
 
 
 def _uuid_128(value):
@@ -38,7 +40,7 @@ def _uuid_128(value):
 
 CONFIG_SCHEMA = cv.Schema(
     {
-        cv.GenerateID(): cv.declare_id(UARTNordicServerComponent),
+        cv.GenerateID(): cv.declare_id(BLENUSServerComponent),
         cv.Required(CONF_PIN): cv.int_range(min=0, max=999999),
         cv.Optional(CONF_SERVICE_UUID, default="6E400001-B5A3-F393-E0A9-E50E24DCCA9E"): _uuid_128,
         cv.Optional(CONF_RX_UUID, default="6E400002-B5A3-F393-E0A9-E50E24DCCA9E"): _uuid_128,
@@ -48,6 +50,8 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_AUTOCONNECT, default=True): cv.boolean,
         cv.Optional(CONF_ON_CONNECTED): automation.validate_automation(),
         cv.Optional(CONF_ON_DISCONNECTED): automation.validate_automation(),
+        cv.Optional(CONF_ON_SENT): automation.validate_automation(),
+        cv.Optional(CONF_ON_DATA): automation.validate_automation(),
     }
 )
 
@@ -72,20 +76,28 @@ async def to_code(config):
         for conf in config[CONF_ON_DISCONNECTED]:
             await automation.build_automation(var.get_on_disconnected_trigger(), [], conf)
 
+    if CONF_ON_SENT in config:
+        for conf in config[CONF_ON_SENT]:
+            await automation.build_automation(var.get_on_sent_trigger(), [], conf)
 
-@automation.register_action(START_ADVERTISING_ACTION, StartAdvertisingAction, cv.Schema({cv.GenerateID(): cv.use_id(UARTNordicServerComponent)}))
+    if CONF_ON_DATA in config:
+        for conf in config[CONF_ON_DATA]:
+            await automation.build_automation(var.get_on_data_trigger(), [], conf)
+
+
+@automation.register_action(START_ADVERTISING_ACTION, StartAdvertisingAction, cv.Schema({cv.GenerateID(): cv.use_id(BLENUSServerComponent)}))
 async def start_adv_action_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, paren)
 
 
-@automation.register_action(STOP_ADVERTISING_ACTION, StopAdvertisingAction, cv.Schema({cv.GenerateID(): cv.use_id(UARTNordicServerComponent)}))
+@automation.register_action(STOP_ADVERTISING_ACTION, StopAdvertisingAction, cv.Schema({cv.GenerateID(): cv.use_id(BLENUSServerComponent)}))
 async def stop_adv_action_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, paren)
 
 
-@automation.register_action(DISCONNECT_ACTION, DisconnectAction, cv.Schema({cv.GenerateID(): cv.use_id(UARTNordicServerComponent)}))
+@automation.register_action(DISCONNECT_ACTION, DisconnectAction, cv.Schema({cv.GenerateID(): cv.use_id(BLENUSServerComponent)}))
 async def disconnect_action_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, paren)

@@ -10,9 +10,9 @@
 #include "esphome/core/ring_buffer.h"
 
 namespace esphome {
-namespace uart_nordic_server {
+namespace ble_nus_server {
 
-class UARTNordicServerComponent : public uart::UARTComponent, public Component {
+class BLENUSServerComponent : public uart::UARTComponent, public Component {
  public:
   void setup() override;
   void loop() override;
@@ -38,6 +38,8 @@ class UARTNordicServerComponent : public uart::UARTComponent, public Component {
 
   Trigger<> *get_on_connected_trigger() { return &this->on_connected_; }
   Trigger<> *get_on_disconnected_trigger() { return &this->on_disconnected_; }
+  Trigger<> *get_on_sent_trigger() { return &this->on_sent_; }
+  Trigger<> *get_on_data_trigger() { return &this->on_data_; }
 
   // Actions
   void start_advertising();
@@ -91,34 +93,36 @@ class UARTNordicServerComponent : public uart::UARTComponent, public Component {
 
   Trigger<> on_connected_;
   Trigger<> on_disconnected_;
+  Trigger<> on_sent_;
+  Trigger<> on_data_;
 };
 
 class StartAdvertisingAction : public Action<> {
  public:
-  explicit StartAdvertisingAction(UARTNordicServerComponent *parent) : parent_(parent) {}
+  explicit StartAdvertisingAction(BLENUSServerComponent *parent) : parent_(parent) {}
   void play() override { parent_->start_advertising(); }
 
  protected:
-  UARTNordicServerComponent *parent_;
+  BLENUSServerComponent *parent_;
 };
 
 class StopAdvertisingAction : public Action<> {
  public:
-  explicit StopAdvertisingAction(UARTNordicServerComponent *parent) : parent_(parent) {}
+  explicit StopAdvertisingAction(BLENUSServerComponent *parent) : parent_(parent) {}
   void play() override { parent_->stop_advertising(); }
 
  protected:
-  UARTNordicServerComponent *parent_;
+  BLENUSServerComponent *parent_;
 };
 
 class DisconnectAction : public Action<> {
  public:
-  explicit DisconnectAction(UARTNordicServerComponent *parent) : parent_(parent) {}
+  explicit DisconnectAction(BLENUSServerComponent *parent) : parent_(parent) {}
   void play() override { parent_->disconnect(); }
 
  protected:
-  UARTNordicServerComponent *parent_;
+  BLENUSServerComponent *parent_;
 };
 
-}  // namespace uart_nordic_server
+}  // namespace ble_nus_server
 }  // namespace esphome

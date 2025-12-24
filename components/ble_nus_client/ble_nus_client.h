@@ -15,11 +15,11 @@
 #include "esphome/core/ring_buffer.h"
 
 namespace esphome {
-namespace uart_nordic {
+namespace ble_nus_client {
 
 namespace espbt = esphome::esp32_ble_tracker;
 
-class UARTNordicComponent : public uart::UARTComponent, public ble_client::BLEClientNode, public Component {
+class BLENUSClientComponent : public uart::UARTComponent, public ble_client::BLEClientNode, public Component {
  public:
   enum class FsmState : uint8_t {
     IDLE,
@@ -70,7 +70,8 @@ class UARTNordicComponent : public uart::UARTComponent, public ble_client::BLECl
 
   Trigger<> *get_on_connected_trigger() { return &this->on_connected_; }
   Trigger<> *get_on_disconnected_trigger() { return &this->on_disconnected_; }
-  Trigger<> *get_on_tx_complete_trigger() { return &this->on_tx_complete_; }
+  Trigger<> *get_on_sent_trigger() { return &this->on_sent_; }
+  Trigger<> *get_on_data_trigger() { return &this->on_data_; }
 
  protected:
   void set_state_(FsmState state);
@@ -95,7 +96,8 @@ class UARTNordicComponent : public uart::UARTComponent, public ble_client::BLECl
 
   Trigger<> on_connected_;
   Trigger<> on_disconnected_;
-  Trigger<> on_tx_complete_;
+  Trigger<> on_sent_;
+  Trigger<> on_data_;
 
   uint16_t chr_commands_handle_{0};
   uint16_t chr_responses_handle_{0};
@@ -133,23 +135,23 @@ class UARTNordicComponent : public uart::UARTComponent, public ble_client::BLECl
   int8_t rssi_{0};
 };
 
-class UARTNordicConnectAction : public Action<> {
+class BLENUSClientConnectAction : public Action<> {
  public:
-  explicit UARTNordicConnectAction(UARTNordicComponent *parent) : parent_(parent) {}
+  explicit BLENUSClientConnectAction(BLENUSClientComponent *parent) : parent_(parent) {}
   void play() override { parent_->connect(); }
 
  protected:
-  UARTNordicComponent *parent_;
+  BLENUSClientComponent *parent_;
 };
 
-class UARTNordicDisconnectAction : public Action<> {
+class BLENUSClientDisconnectAction : public Action<> {
  public:
-  explicit UARTNordicDisconnectAction(UARTNordicComponent *parent) : parent_(parent) {}
+  explicit BLENUSClientDisconnectAction(BLENUSClientComponent *parent) : parent_(parent) {}
   void play() override { parent_->disconnect(); }
 
  protected:
-  UARTNordicComponent *parent_;
+  BLENUSClientComponent *parent_;
 };
 
-}  // namespace uart_nordic
+}  // namespace ble_nus_client
 }  // namespace esphome

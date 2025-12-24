@@ -11,9 +11,10 @@ CODEOWNERS = ["@latonita"]
 CONF_MTU = "mtu"
 CONF_ON_CONNECTED = "on_connected"
 CONF_ON_DISCONNECTED = "on_disconnected"
-CONF_ON_TX_COMPLETE = "on_tx_complete"
-CONNECT_ACTION = "uart_nordic.connect"
-DISCONNECT_ACTION = "uart_nordic.disconnect"
+CONF_ON_SENT = "on_sent"
+CONF_ON_DATA = "on_data"
+CONNECT_ACTION = "ble_nus_client.connect"
+DISCONNECT_ACTION = "ble_nus_client.disconnect"
 CONF_IDLE_TIMEOUT = "idle_timeout"
 CONF_AUTOCONNECT = "autoconnect"
 
@@ -23,12 +24,12 @@ AUTO_LOAD = ["uart", "ble_client"]
 CONF_TX_UUID = "tx_uuid"
 CONF_RX_UUID = "rx_uuid"
 
-uart_nordic_ns = cg.esphome_ns.namespace("uart_nordic")
-UARTNordicComponent = uart_nordic_ns.class_(
-    "UARTNordicComponent", uart.UARTComponent, cg.Component
+ble_nus_client_ns = cg.esphome_ns.namespace("ble_nus_client")
+BLENUSClientComponent = ble_nus_client_ns.class_(
+    "BLENUSClientComponent", uart.UARTComponent, cg.Component
 )
-UARTNordicConnectAction = uart_nordic_ns.class_("UARTNordicConnectAction", automation.Action)
-UARTNordicDisconnectAction = uart_nordic_ns.class_("UARTNordicDisconnectAction", automation.Action)
+BLENUSClientConnectAction = ble_nus_client_ns.class_("BLENUSClientConnectAction", automation.Action)
+BLENUSClientDisconnectAction = ble_nus_client_ns.class_("BLENUSClientDisconnectAction", automation.Action)
 
 _UUID128_FORMAT = "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
 
@@ -46,7 +47,7 @@ def _uuid_128(value):
 
 CONFIG_SCHEMA = cv.Schema(
     {
-        cv.GenerateID(): cv.declare_id(UARTNordicComponent),
+        cv.GenerateID(): cv.declare_id(BLENUSClientComponent),
         cv.Optional(CONF_SERVICE_UUID, default="6E400001-B5A3-F393-E0A9-E50E24DCCA9E"): _uuid_128,
         cv.Optional(CONF_RX_UUID, default="6E400002-B5A3-F393-E0A9-E50E24DCCA9E"): _uuid_128,
         cv.Optional(CONF_TX_UUID, default="6E400003-B5A3-F393-E0A9-E50E24DCCA9E"): _uuid_128,
@@ -56,7 +57,8 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_AUTOCONNECT, default=False): cv.boolean,
         cv.Optional(CONF_ON_CONNECTED): automation.validate_automation(),
         cv.Optional(CONF_ON_DISCONNECTED): automation.validate_automation(),
-        cv.Optional(CONF_ON_TX_COMPLETE): automation.validate_automation(),
+        cv.Optional(CONF_ON_SENT): automation.validate_automation(),
+        cv.Optional(CONF_ON_DATA): automation.validate_automation(),
     }
 ).extend(ble_client.BLE_CLIENT_SCHEMA)
 
@@ -82,18 +84,22 @@ async def to_code(config):
         for conf in config[CONF_ON_DISCONNECTED]:
             await automation.build_automation(var.get_on_disconnected_trigger(), [], conf)
 
-    if CONF_ON_TX_COMPLETE in config:
-        for conf in config[CONF_ON_TX_COMPLETE]:
-            await automation.build_automation(var.get_on_tx_complete_trigger(), [], conf)
+    if CONF_ON_SENT in config:
+        for conf in config[CONF_ON_SENT]:
+            await automation.build_automation(var.get_on_sent_trigger(), [], conf)
+
+    if CONF_ON_DATA in config:
+        for conf in config[CONF_ON_DATA]:
+            await automation.build_automation(var.get_on_data_trigger(), [], conf)
 
 
-@automation.register_action(CONNECT_ACTION, UARTNordicConnectAction, automation.maybe_simple_id({cv.GenerateID(): cv.use_id(UARTNordicComponent)}))
-async def uart_nordic_connect_to_code(config, action_id, template_arg, args):
+@automation.register_action(CONNECT_ACTION, BLENUSClientConnectAction, automation.maybe_simple_id({cv.GenerateID(): cv.use_id(BLENUSClientComponent)}))
+async def ble_nus_client_connect_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, paren)
 
 
-@automation.register_action(DISCONNECT_ACTION, UARTNordicDisconnectAction, automation.maybe_simple_id({cv.GenerateID(): cv.use_id(UARTNordicComponent)}))
-async def uart_nordic_disconnect_to_code(config, action_id, template_arg, args):
+@automation.register_action(DISCONNECT_ACTION, BLENUSClientDisconnectAction, automation.maybe_simple_id({cv.GenerateID(): cv.use_id(BLENUSClientComponent)}))
+async def ble_nus_client_disconnect_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, paren)

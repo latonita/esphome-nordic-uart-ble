@@ -1,24 +1,24 @@
-#include "uart_nordic.h"
+#include "ble_nus_client.h"
 
 #include "esphome/core/log.h"
 
 namespace esphome {
-namespace uart_nordic {
+namespace ble_nus_client {
 
-static const char *const TAG = "uart_nordic";
+static const char *const TAG = "ble_nus_client";
 
-void UARTNordicComponent::setup() {
+void BLENUSClientComponent::setup() {
   this->rx_buffer_ = esphome::RingBuffer::create(RX_BUFFER_CAPACITY);
   this->tx_buffer_ = esphome::RingBuffer::create(TX_BUFFER_CAPACITY);
   this->peek_valid_ = false;
   this->set_state_(FsmState::IDLE);
 }
 
-void UARTNordicComponent::loop() { this->handle_state_(); }
+void BLENUSClientComponent::loop() { this->handle_state_(); }
 
-void UARTNordicComponent::dump_config() { ESP_LOGCONFIG(TAG, "UART Nordic Component (stub)"); }
+void BLENUSClientComponent::dump_config() { ESP_LOGCONFIG(TAG, "BLE NUS Client"); }
 
-const LogString *UARTNordicComponent::state_to_string(FsmState s) const {
+const LogString *BLENUSClientComponent::state_to_string(FsmState s) const {
   switch (s) {
     case FsmState::IDLE:
       return LOG_STR("IDLE");
@@ -39,7 +39,7 @@ const LogString *UARTNordicComponent::state_to_string(FsmState s) const {
   }
 }
 
-bool UARTNordicComponent::connect() {
+bool BLENUSClientComponent::connect() {
   if (this->parent_ == nullptr) {
     ESP_LOGE(TAG, "BLE client parent not configured");
     this->set_state_(FsmState::ERROR);
@@ -93,7 +93,7 @@ bool UARTNordicComponent::connect() {
   return true;
 }
 
-void UARTNordicComponent::disconnect() {
+void BLENUSClientComponent::disconnect() {
   if (this->parent_ == nullptr) {
     return;
   }
@@ -102,7 +102,7 @@ void UARTNordicComponent::disconnect() {
   this->parent_->disconnect();
 }
 
-void UARTNordicComponent::write_array(const uint8_t *data, size_t len) {
+void BLENUSClientComponent::write_array(const uint8_t *data, size_t len) {
   if (data == nullptr || len == 0 || this->tx_buffer_ == nullptr) {
     return;
   }
@@ -121,11 +121,11 @@ void UARTNordicComponent::write_array(const uint8_t *data, size_t len) {
   }
 }
 
-void UARTNordicComponent::write_byte(uint8_t data) { this->write_array(&data, 1); }
+void BLENUSClientComponent::write_byte(uint8_t data) { this->write_array(&data, 1); }
 
-bool UARTNordicComponent::read_byte(uint8_t *data) { return this->read_array(data, 1); }
+bool BLENUSClientComponent::read_byte(uint8_t *data) { return this->read_array(data, 1); }
 
-bool UARTNordicComponent::peek_byte(uint8_t *data) {
+bool BLENUSClientComponent::peek_byte(uint8_t *data) {
   if (this->state_ != FsmState::UART_LINK_ESTABLISHED) {
     this->maybe_autoconnect_();
   }
@@ -154,7 +154,7 @@ bool UARTNordicComponent::peek_byte(uint8_t *data) {
   return true;
 }
 
-bool UARTNordicComponent::read_array(uint8_t *data, size_t len) {
+bool BLENUSClientComponent::read_array(uint8_t *data, size_t len) {
   if (this->state_ != FsmState::UART_LINK_ESTABLISHED) {
     this->maybe_autoconnect_();
   }
@@ -188,7 +188,7 @@ bool UARTNordicComponent::read_array(uint8_t *data, size_t len) {
   return false;
 }
 
-int UARTNordicComponent::available() {
+int BLENUSClientComponent::available() {
   if (this->state_ != FsmState::UART_LINK_ESTABLISHED) {
     this->maybe_autoconnect_();
   }
@@ -198,7 +198,7 @@ int UARTNordicComponent::available() {
   return static_cast<int>(this->rx_buffer_->available() + (this->peek_valid_ ? 1 : 0));
 }
 
-void UARTNordicComponent::flush() {
+void BLENUSClientComponent::flush() {
   if (this->state_ != FsmState::UART_LINK_ESTABLISHED) {
     this->maybe_autoconnect_();
   }
@@ -214,7 +214,7 @@ void UARTNordicComponent::flush() {
   }
 }
 
-void UARTNordicComponent::set_state_(FsmState state) {
+void BLENUSClientComponent::set_state_(FsmState state) {
   if (this->state_ != state) {
     ESP_LOGV(TAG, "FSM state: %s -> %s", LOG_STR_ARG(this->state_to_string(this->state_)),
              LOG_STR_ARG(this->state_to_string(state)));
@@ -223,7 +223,7 @@ void UARTNordicComponent::set_state_(FsmState state) {
   this->state_enter_ms_ = millis();
 }
 
-void UARTNordicComponent::send_next_chunk_in_ble_() {
+void BLENUSClientComponent::send_next_chunk_in_ble_() {
   if (this->state_ != FsmState::UART_LINK_ESTABLISHED || this->tx_buffer_ == nullptr ||
       this->chr_commands_handle_ == 0) {
     this->tx_in_progress_ = false;
@@ -258,7 +258,7 @@ void UARTNordicComponent::send_next_chunk_in_ble_() {
   }
 }
 
-bool UARTNordicComponent::maybe_autoconnect_() {
+bool BLENUSClientComponent::maybe_autoconnect_() {
   if (!this->autoconnect_on_access_) {
     return false;
   }
@@ -276,14 +276,14 @@ bool UARTNordicComponent::maybe_autoconnect_() {
   return true;
 }
 
-void UARTNordicComponent::defer_in_ble_(const std::function<void()> &fn) {
+void BLENUSClientComponent::defer_in_ble_(const std::function<void()> &fn) {
   this->ble_defer_fn_ = fn;
   if (this->parent_ != nullptr) {
     esp_ble_gap_read_rssi(this->parent_->get_remote_bda());
   }
 }
 
-void UARTNordicComponent::watchdog_() {
+void BLENUSClientComponent::watchdog_() {
   switch (this->state_) {
     case FsmState::CONNECTING:
     case FsmState::DISCOVERING:
@@ -303,7 +303,7 @@ void UARTNordicComponent::watchdog_() {
   }
 }
 
-void UARTNordicComponent::handle_state_() {
+void BLENUSClientComponent::handle_state_() {
   if (this->state_ != this->last_reported_state_) {
     ESP_LOGV(TAG, "FSM state: %s", LOG_STR_ARG(this->state_to_string(this->state_)));
     this->last_reported_state_ = this->state_;
@@ -344,7 +344,7 @@ void UARTNordicComponent::handle_state_() {
   }
 }
 
-bool UARTNordicComponent::discover_characteristics_() {
+bool BLENUSClientComponent::discover_characteristics_() {
   auto chr_commands = this->parent_->get_characteristic(this->service_uuid_, this->rx_uuid_for_commands_);
   auto chr_responses = this->parent_->get_characteristic(this->service_uuid_, this->tx_uuid_for_responses_);
 
@@ -370,7 +370,7 @@ bool UARTNordicComponent::discover_characteristics_() {
   return true;
 }
 
-void UARTNordicComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if,
+void BLENUSClientComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if,
                                               esp_ble_gattc_cb_param_t *param) {
   
   if (this->parent_ == nullptr) {
@@ -474,7 +474,7 @@ void UARTNordicComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_ga
         if (pending == 0) {
           this->tx_in_progress_ = false;
           ESP_LOGV(TAG, "TX completed: no more data to send");
-          this->on_tx_complete_.trigger();
+          this->on_sent_.trigger();
           return;
         } else {
           this->last_activity_ms_ = millis();
@@ -511,6 +511,7 @@ void UARTNordicComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_ga
           ESP_LOGW(TAG, "RX buffer overflow, dropped %d bytes", param->notify.value_len - (int) written);
         }
         this->last_activity_ms_ = millis();
+        this->on_data_.trigger();
       }
     } break;
     case ESP_GATTC_DISCONNECT_EVT: {
@@ -523,7 +524,7 @@ void UARTNordicComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_ga
   }
 }
 
-void UARTNordicComponent::gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) {
+void BLENUSClientComponent::gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) {
   switch (event) {
     case ESP_GAP_BLE_PASSKEY_REQ_EVT: {
       if (!this->parent_->check_addr(param->ble_security.ble_req.bd_addr)) {
@@ -573,5 +574,5 @@ void UARTNordicComponent::gap_event_handler(esp_gap_ble_cb_event_t event, esp_bl
   }
 }
 
-}  // namespace uart_nordic
+}  // namespace ble_nus_client
 }  // namespace esphome

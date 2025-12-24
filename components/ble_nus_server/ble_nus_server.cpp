@@ -1,13 +1,13 @@
-#include "uart_nordic_server.h"
+#include "ble_nus_server.h"
 
 #include "esphome/core/log.h"
 
 namespace esphome {
-namespace uart_nordic_server {
+namespace ble_nus_server {
 
-static const char *const TAG = "uart_nordic_server";
+static const char *const TAG = "ble_nus_server";
 
-void UARTNordicServerComponent::setup() {
+void BLENUSServerComponent::setup() {
   this->rx_buffer_ = esphome::RingBuffer::create(RX_BUFFER_CAPACITY);
   this->tx_buffer_ = esphome::RingBuffer::create(TX_BUFFER_CAPACITY);
   this->peek_valid_ = false;
@@ -17,14 +17,14 @@ void UARTNordicServerComponent::setup() {
   }
 }
 
-void UARTNordicServerComponent::loop() {
+void BLENUSServerComponent::loop() {
   this->handle_idle_();
   this->publish_notifications_();
 }
 
-void UARTNordicServerComponent::dump_config() { ESP_LOGCONFIG(TAG, "UART Nordic Server (BLE NUS)"); }
+void BLENUSServerComponent::dump_config() { ESP_LOGCONFIG(TAG, "UART Nordic Server (BLE NUS)"); }
 
-void UARTNordicServerComponent::handle_idle_() {
+void BLENUSServerComponent::handle_idle_() {
   if (!this->connected_ || this->idle_disconnect_timeout_ms_ == 0) {
     return;
   }
@@ -34,7 +34,7 @@ void UARTNordicServerComponent::handle_idle_() {
   }
 }
 
-void UARTNordicServerComponent::publish_notifications_() {
+void BLENUSServerComponent::publish_notifications_() {
   if (!this->connected_ || !this->notifications_enabled_ || this->tx_buffer_ == nullptr || this->chr_tx_handle_ == 0) {
     return;
   }
@@ -58,10 +58,11 @@ void UARTNordicServerComponent::publish_notifications_() {
   this->tx_char_->notify();
   ESP_LOGVV(TAG, "TX notify: %s", format_hex_pretty(chunk.data(), pulled).c_str());
   this->last_activity_ms_ = millis();
+  this->on_sent_.trigger();
   this->tx_in_progress_ = false;
 }
 
-void UARTNordicServerComponent::write_array(const uint8_t *data, size_t len) {
+void BLENUSServerComponent::write_array(const uint8_t *data, size_t len) {
   if (data == nullptr || len == 0 || this->tx_buffer_ == nullptr) {
     return;
   }
@@ -72,7 +73,7 @@ void UARTNordicServerComponent::write_array(const uint8_t *data, size_t len) {
   this->last_activity_ms_ = millis();
 }
 
-bool UARTNordicServerComponent::peek_byte(uint8_t *data) {
+bool BLENUSServerComponent::peek_byte(uint8_t *data) {
   if (this->peek_valid_) {
     if (data != nullptr) {
       *data = this->peek_byte_;
@@ -98,7 +99,7 @@ bool UARTNordicServerComponent::peek_byte(uint8_t *data) {
   return true;
 }
 
-bool UARTNordicServerComponent::read_array(uint8_t *data, size_t len) {
+bool BLENUSServerComponent::read_array(uint8_t *data, size_t len) {
   if (data == nullptr || len == 0) {
     return true;
   }
@@ -129,14 +130,14 @@ bool UARTNordicServerComponent::read_array(uint8_t *data, size_t len) {
   return false;
 }
 
-int UARTNordicServerComponent::available() {
+int BLENUSServerComponent::available() {
   if (this->rx_buffer_ == nullptr) {
     return 0;
   }
   return static_cast<int>(this->rx_buffer_->available() + (this->peek_valid_ ? 1 : 0));
 }
 
-void UARTNordicServerComponent::flush() {
+void BLENUSServerComponent::flush() {
   const uint32_t start = millis();
   while (this->tx_in_progress_ || (this->tx_buffer_ != nullptr && this->tx_buffer_->available() > 0)) {
     if (millis() - start > this->tx_flush_timeout_ms_) {
@@ -149,7 +150,7 @@ void UARTNordicServerComponent::flush() {
   }
 }
 
-void UARTNordicServerComponent::start_advertising() {
+void BLENUSServerComponent::start_advertising() {
   if (this->server_ == nullptr) {
     ESP_LOGW(TAG, "BLE server not initialized, cannot advertise");
     return;
@@ -158,7 +159,7 @@ void UARTNordicServerComponent::start_advertising() {
   this->service_->start();
 }
 
-void UARTNordicServerComponent::stop_advertising() {
+void BLENUSServerComponent::stop_advertising() {
   if (this->service_ == nullptr) {
     return;
   }
@@ -166,7 +167,7 @@ void UARTNordicServerComponent::stop_advertising() {
   this->service_->stop();
 }
 
-void UARTNordicServerComponent::disconnect() {
+void BLENUSServerComponent::disconnect() {
   if (this->server_ == nullptr) {
     return;
   }
@@ -177,7 +178,7 @@ void UARTNordicServerComponent::disconnect() {
   this->on_disconnected_.trigger();
 }
 
-void UARTNordicServerComponent::handle_rx_write_(const uint8_t *data, uint16_t len) {
+void BLENUSServerComponent::handle_rx_write_(const uint8_t *data, uint16_t len) {
   if (data == nullptr || len == 0 || this->rx_buffer_ == nullptr) {
     return;
   }
@@ -188,7 +189,7 @@ void UARTNordicServerComponent::handle_rx_write_(const uint8_t *data, uint16_t l
   this->last_activity_ms_ = millis();
 }
 
-void UARTNordicServerComponent::init_gatt_() {
+void BLENUSServerComponent::init_gatt_() {
   this->server_ = esp32_ble_server::global_ble_server;
   if (this->server_ == nullptr) {
     ESP_LOGE(TAG, "esp32_ble_server not available");
@@ -218,13 +219,14 @@ void UARTNordicServerComponent::init_gatt_() {
   if (this->rx_char_ != nullptr) {
     this->rx_char_->on_write([this](std::span<const uint8_t> data, uint16_t) {
       this->handle_rx_write_(data.data(), data.size());
+      this->on_data_.trigger();
     });
   }
 
   this->server_->enqueue_start_service(this->service_);
 }
 
-void UARTNordicServerComponent::on_connect_(uint16_t conn_id) {
+void BLENUSServerComponent::on_connect_(uint16_t conn_id) {
   ESP_LOGI(TAG, "Client connected (conn_id=%u)", conn_id);
   this->connected_ = true;
   this->conn_id_ = conn_id;
@@ -233,7 +235,7 @@ void UARTNordicServerComponent::on_connect_(uint16_t conn_id) {
   this->on_connected_.trigger();
 }
 
-void UARTNordicServerComponent::on_disconnect_(uint16_t conn_id) {
+void BLENUSServerComponent::on_disconnect_(uint16_t conn_id) {
   ESP_LOGI(TAG, "Client disconnected (conn_id=%u)", conn_id);
   this->connected_ = false;
   this->notifications_enabled_ = false;
@@ -243,5 +245,5 @@ void UARTNordicServerComponent::on_disconnect_(uint16_t conn_id) {
   }
 }
 
-}  // namespace uart_nordic_server
+}  // namespace ble_nus_server
 }  // namespace esphome

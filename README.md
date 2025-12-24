@@ -4,7 +4,7 @@
 [Ленэлектро ЛЕ-2](https://github.com/latonita/esphome-le2-meter) • [Пульсар-М](https://github.com/latonita/esphome-pulsar-m) •
 [Энергомера BLE](https://github.com/latonita/esphome-energomera-ble)
 
-# ESPHome UART Nordic (BLE NUS) Client
+# ESPHome BLE NUS (Nordic UART Service) Client
 
 A drop-in UART-like transport over Bluetooth LE Nordic UART Service (NUS). It implements the usual UART surface (`write_array`, `read_array`, `peek_byte`, `available`, `flush`) plus explicit `connect()` / `disconnect()`, optional auto-connect, and an optional idle auto-disconnect. You can point existing UART-based components at this transport to replace a wired UART with BLE NUS without code changes in the consumer.
 
@@ -38,7 +38,7 @@ some_component:
   uart_id: uart_bus
 
 # After (BLE NUS)
-uart_nordic:
+ble_nus_client:
   id: ble_uart
   pin: 123456
   # optional: idle_timeout: 5min
@@ -49,11 +49,11 @@ some_component:
 ```
 
 ## Nordic UART Server (coming soon)
-This repository also contains a skeleton `uart_nordic_server` component intended to expose NUS as a BLE peripheral (ESP32 acts as the NUS server). It mirrors the client-facing options (UUIDs, PIN, MTU, idle timeout, auto-advertise) and will offer the same UART-like API plus advertising controls and connect/disconnect triggers. The current implementation is a stub ready to be wired into `esp32_ble` server APIs.
+This repository also contains a skeleton `ble_nus_client_server` component intended to expose NUS as a BLE peripheral (ESP32 acts as the NUS server). It mirrors the client-facing options (UUIDs, PIN, MTU, idle timeout, auto-advertise) and will offer the same UART-like API plus advertising controls and connect/disconnect triggers. The current implementation is a stub ready to be wired into `esp32_ble` server APIs.
 
 ## YAML (stub)
 ```yaml
-uart_nordic:
+ble_nus_client:
   id: ble_uart
   pin: 123456
   service_uuid: 6e400001-b5a3-f393-e0a9-e50e24dcca9e
@@ -73,15 +73,15 @@ uart_nordic:
 interval:
   - interval: 60s
     then:
-      - uart_nordic.connect: ble_uart
+      - ble_nus_client.connect: ble_uart
 
-uart_nordic:
+ble_nus_client:
   id: ble_uart
   pin: 123456
   on_connected:
     - lambda: |-
         id(my_component).update();
-    # - uart_nordic.disconnect: ble_uart # if component only sends data/receives once in update() then you can disconnect, if its long loop() process - dont call disconnect
+    # - ble_nus_client.disconnect: ble_uart # if component only sends data/receives once in update() then you can disconnect, if its long loop() process - dont call disconnect
 
 ```
 
@@ -89,15 +89,16 @@ uart_nordic:
 ## Configuration variables
 - **id** (Required): Component ID.
 - **pin** (Required, int): 6-digit BLE pairing PIN.
-- **service_uuid** (Optional, string): NUS service UUID. Default `6E400001-B5A3-F393-E0A9-E50E24DCCA9E`.
-- **rx_uuid** (Optional, string): NUS RX characteristic (writes from client). Default `6E400002-B5A3-F393-E0A9-E50E24DCCA9E`.
-- **tx_uuid** (Optional, string): NUS TX characteristic (notifications to client). Default `6E400003-B5A3-F393-E0A9-E50E24DCCA9E`.
+- **service_uuid** (Optional, string): NUS service UUID. Default `6e400001-b5a3-f393-e0a9-e50e24dcca9e`.
+- **rx_uuid** (Optional, string): NUS RX characteristic (writes from client). Default `6e400002-b5a3-f393-e0a9-e50e24dcca9e`.
+- **tx_uuid** (Optional, string): NUS TX characteristic (notifications to client). Default `6e400003-b5a3-f393-e0a9-e50e24dcca9e`.
 - **mtu** (Optional, int): Desired MTU, 23–517. Default `247`.
 - **idle_timeout** (Optional, time): Auto-disconnect after no RX/TX activity. `0s` disables (default).
 - **autoconnect** (Optional, bool): If `true`, any UART access while disconnected will trigger a BLE connect attempt (once per second max). Default `false`.
 - **on_connected** (Optional): Automation when BLE link is established.
 - **on_disconnected** (Optional): Automation when BLE link drops.
-- **on_tx_complete** (Optional): Automation when transmission finished and confirmed by remote device.
+- **on_sent** (Optional): Automation when transmission finished and confirmed by remote device.
+- **on_data** (Optional): Automation when any notification payload is received.
 - All other options from `ble_client`.
 
 ## Triggers
@@ -105,28 +106,30 @@ uart_nordic:
 - `on_disconnected`: Fired when the BLE link closes.
 
 ## Actions
-- `uart_nordic.connect`: Initiate a BLE connection.
-- `uart_nordic.disconnect`: Disconnect the BLE link.
+- `ble_nus_client.connect`: Initiate a BLE connection.
+- `ble_nus_client.disconnect`: Disconnect the BLE link.
 
 ### Example triggers/actions
 ```
-uart_nordic:
+ble_nus_client:
   id: ble_uart
   pin: 123456
   on_connected:
-    - logger.log: "UART Nordic connected"
+    - logger.log: "BLE NUS Client connected"
   on_disconnected:
-    - logger.log: "UART Nordic disconnected"
-  on_tx_complete:
+    - logger.log: "BLE NUS Client disconnected"
+  on_sent:
     - logger.log: "Data Transmission Completed"
+  on_data:
+    - logger.log: "Data Received"
 
 button:
   - platform: template
     name: "Nordic UART Connect"
     on_press:
-      - uart_nordic.connect: ble_uart
+      - ble_nus_client.connect: ble_uart
   - platform: template
     name: "Nordic UART Disconnect"
     on_press:
-      - uart_nordic.disconnect: ble_uart
+      - ble_nus_client.disconnect: ble_uart
 ```
