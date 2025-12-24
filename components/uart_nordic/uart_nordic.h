@@ -70,6 +70,7 @@ class UARTNordicComponent : public uart::UARTComponent, public ble_client::BLECl
 
   Trigger<> *get_on_connected_trigger() { return &this->on_connected_; }
   Trigger<> *get_on_disconnected_trigger() { return &this->on_disconnected_; }
+  Trigger<> *get_on_tx_complete_trigger() { return &this->on_tx_complete_; }
 
  protected:
   void set_state_(FsmState state);
@@ -94,6 +95,7 @@ class UARTNordicComponent : public uart::UARTComponent, public ble_client::BLECl
 
   Trigger<> on_connected_;
   Trigger<> on_disconnected_;
+  Trigger<> on_tx_complete_;
 
   uint16_t chr_commands_handle_{0};
   uint16_t chr_responses_handle_{0};

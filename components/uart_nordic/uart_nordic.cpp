@@ -474,6 +474,7 @@ void UARTNordicComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_ga
         if (pending == 0) {
           this->tx_in_progress_ = false;
           ESP_LOGV(TAG, "TX completed: no more data to send");
+          this->on_tx_complete_.trigger();
           return;
         } else {
           this->last_activity_ms_ = millis();

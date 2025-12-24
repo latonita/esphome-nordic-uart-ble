@@ -11,6 +11,7 @@ CODEOWNERS = ["@latonita"]
 CONF_MTU = "mtu"
 CONF_ON_CONNECTED = "on_connected"
 CONF_ON_DISCONNECTED = "on_disconnected"
+CONF_ON_TX_COMPLETE = "on_tx_complete"
 CONNECT_ACTION = "uart_nordic.connect"
 DISCONNECT_ACTION = "uart_nordic.disconnect"
 CONF_IDLE_TIMEOUT = "idle_timeout"
@@ -55,6 +56,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_AUTOCONNECT, default=False): cv.boolean,
         cv.Optional(CONF_ON_CONNECTED): automation.validate_automation(),
         cv.Optional(CONF_ON_DISCONNECTED): automation.validate_automation(),
+        cv.Optional(CONF_ON_TX_COMPLETE): automation.validate_automation(),
     }
 ).extend(ble_client.BLE_CLIENT_SCHEMA)
 
@@ -79,6 +81,10 @@ async def to_code(config):
     if CONF_ON_DISCONNECTED in config:
         for conf in config[CONF_ON_DISCONNECTED]:
             await automation.build_automation(var.get_on_disconnected_trigger(), [], conf)
+
+    if CONF_ON_TX_COMPLETE in config:
+        for conf in config[CONF_ON_TX_COMPLETE]:
+            await automation.build_automation(var.get_on_tx_complete_trigger(), [], conf)
 
 
 @automation.register_action(CONNECT_ACTION, UARTNordicConnectAction, automation.maybe_simple_id({cv.GenerateID(): cv.use_id(UARTNordicComponent)}))

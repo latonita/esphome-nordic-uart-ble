@@ -8,6 +8,21 @@
 
 A drop-in UART-like transport over Bluetooth LE Nordic UART Service (NUS). It implements the usual UART surface (`write_array`, `read_array`, `peek_byte`, `available`, `flush`) plus explicit `connect()` / `disconnect()`, optional auto-connect, and an optional idle auto-disconnect. You can point existing UART-based components at this transport to replace a wired UART with BLE NUS without code changes in the consumer.
 
+## What is NUS (Nordic UART Service)?
+Nordic UART Service emulates a serial link over BLE using two characteristics: RX (writes from central to peripheral) and TX (notifications from peripheral to central). The central subscribes to TX notifications, and once that’s acknowledged it writes outbound data to RX. Each packet is limited by the GATT payload (often 20 bytes unless MTU negotiation raises it); the higher-level framing/interpretation is entirely application-specific.
+
+Default UUIDs for NUS are:
+- Service: `6e400001-b5a3-f393-e0a9-e50e24dcca9e`
+- RX: `6e400002-b5a3-f393-e0a9-e50e24dcca9e`
+- TX: `6e400003-b5a3-f393-e0a9-e50e24dcca9e`
+
+Some devices ship with alternate UUIDs (common variant):
+- Service: `6e400001-b5a3-f393-e0a9-e50e24dc4179`
+- RX: `6e400002-b5a3-f393-e0a9-e50e24dc4179`
+- TX: `6e400003-b5a3-f393-e0a9-e50e24dc4179`
+
+Adjust the UUIDs in YAML to match your target peripheral.
+
 
 ### Migrating from wired UART to Nordic UART
 If you already have a component using a wired UART, you can swap it to BLE NUS by pointing it to the Nordic transport:
@@ -38,9 +53,9 @@ some_component:
 uart_nordic:
   id: ble_uart
   pin: 123456
-  service_uuid: 6E400001-B5A3-F393-E0A9-E50E24DCCA9E
-  rx_uuid: 6E400002-B5A3-F393-E0A9-E50E24DCCA9E
-  tx_uuid: 6E400003-B5A3-F393-E0A9-E50E24DCCA9E
+  service_uuid: 6e400001-b5a3-f393-e0a9-e50e24dcca9e
+  rx_uuid: 6e400002-b5a3-f393-e0a9-e50e24dcca9e
+  tx_uuid: 6e400003-b5a3-f393-e0a9-e50e24dcca9e
   mtu: 247
   idle_timeout: 0s      # optional, default disables auto-disconnect
   autoconnect: false    # optional, auto-connect on UART access when disconnected
