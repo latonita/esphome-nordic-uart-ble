@@ -26,6 +26,9 @@ Transitions will be driven by BLE events (connect/discover/CCCD/MTU/notify) once
 - Triggers: `on_connected`, `on_disconnected`
 - Actions: `uart_nordic.connect`, `uart_nordic.disconnect`
 
+## Server (planned/skeleton)
+- `uart_nordic_server` will expose the same UART interface but as a BLE NUS peripheral (ESP32 as server), with UUIDs/PIN/MTU/idle-timeout/auto-advertise options and actions to start/stop advertising.
+
 ## Config (Python)
 Validated UUIDs and PIN:
 - `service_uuid` (default NUS UUID)
