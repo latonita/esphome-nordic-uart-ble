@@ -15,8 +15,9 @@ CONF_ON_SENT = "on_sent"
 CONF_ON_DATA = "on_data"
 CONNECT_ACTION = "ble_nus_client.connect"
 DISCONNECT_ACTION = "ble_nus_client.disconnect"
+SEND_ACTION = "ble_nus_client.send"
 CONF_IDLE_TIMEOUT = "idle_timeout"
-CONF_AUTOCONNECT = "autoconnect"
+CONF_CONNECT_ON_DEMAND = "connect_on_demand"
 
 DEPENDENCIES = ["uart", "ble_client"]
 AUTO_LOAD = ["uart", "ble_client"]
@@ -30,6 +31,7 @@ BLENUSClientComponent = ble_nus_client_ns.class_(
 )
 BLENUSClientConnectAction = ble_nus_client_ns.class_("BLENUSClientConnectAction", automation.Action)
 BLENUSClientDisconnectAction = ble_nus_client_ns.class_("BLENUSClientDisconnectAction", automation.Action)
+BLENUSClientSendAction = ble_nus_client_ns.class_("BLENUSClientSendAction", automation.Action)
 
 _UUID128_FORMAT = "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
 
@@ -54,7 +56,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Required(CONF_PIN): cv.int_range(min=0, max=999999),
         cv.Optional(CONF_MTU, default=247): cv.int_range(min=23, max=517),
         cv.Optional(CONF_IDLE_TIMEOUT, default="0s"): cv.positive_time_period_milliseconds,
-        cv.Optional(CONF_AUTOCONNECT, default=False): cv.boolean,
+        cv.Optional(CONF_CONNECT_ON_DEMAND, default=False): cv.boolean,
         cv.Optional(CONF_ON_CONNECTED): automation.validate_automation(),
         cv.Optional(CONF_ON_DISCONNECTED): automation.validate_automation(),
         cv.Optional(CONF_ON_SENT): automation.validate_automation(),
@@ -74,7 +76,7 @@ async def to_code(config):
     cg.add(var.set_passkey(config[CONF_PIN]))
     cg.add(var.set_mtu(config[CONF_MTU]))
     cg.add(var.set_idle_disconnect_timeout(config[CONF_IDLE_TIMEOUT]))
-    cg.add(var.set_autoconnect_on_access(config[CONF_AUTOCONNECT]))
+    cg.add(var.set_connect_on_demand(config[CONF_CONNECT_ON_DEMAND]))
 
     if CONF_ON_CONNECTED in config:
         for conf in config[CONF_ON_CONNECTED]:
@@ -103,3 +105,20 @@ async def ble_nus_client_connect_to_code(config, action_id, template_arg, args):
 async def ble_nus_client_disconnect_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, paren)
+
+
+SEND_SCHEMA = cv.Schema(
+    {
+        cv.GenerateID(): cv.use_id(BLENUSClientComponent),
+        cv.Required("data"): cv.Any(cv.ensure_list(cv.hex_uint8_t), cv.string_strict),
+    }
+)
+
+
+@automation.register_action(SEND_ACTION, BLENUSClientSendAction, SEND_SCHEMA)
+async def ble_nus_client_send_to_code(config, action_id, template_arg, args):
+    paren = await cg.get_variable(config[CONF_ID])
+    data = config["data"]
+    if isinstance(data, str):
+        data = [ord(c) for c in data]
+    return cg.new_Pvariable(action_id, paren, data)

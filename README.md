@@ -1,8 +1,12 @@
-[Nordic UART BLE](https://github.com/latonita/esphome-nordic-uart-ble) • [СПОДЭС/DLMS/COSEM](https://github.com/latonita/esphome-dlms-cosem) •
-[МЭК-61107/IEC-61107](https://github.com/latonita/esphome-iec61107-meter) • [Энергомера МЭК/IEC](https://github.com/latonita/esphome-energomera-iec) •
-[Энергомера CE](https://github.com/latonita/esphome-energomera-ce) • [СПб ЗИП ЦЭ2727А](https://github.com/latonita/esphome-ce2727a-meter) •
-[Ленэлектро ЛЕ-2](https://github.com/latonita/esphome-le2-meter) • [Пульсар-М](https://github.com/latonita/esphome-pulsar-m) •
-[Энергомера BLE](https://github.com/latonita/esphome-energomera-ble)
+[DLMS/COSEM](https://github.com/latonita/esphome-dlms-cosem) •
+[IEC-61107](https://github.com/latonita/esphome-iec61107-meter) •
+[Energomera IEC](https://github.com/latonita/esphome-energomera-iec) •
+[Energomera CE](https://github.com/latonita/esphome-energomera-ce) •
+[SPb ZIP CE2727A](https://github.com/latonita/esphome-ce2727a-meter) •
+[Lenelektro LE-2](https://github.com/latonita/esphome-le2-meter) •
+[Pulsar-M](https://github.com/latonita/esphome-pulsar-m) •
+[Energomera BLE](https://github.com/latonita/esphome-energomera-ble) •
+[Nordic UART (BLE NUS)](https://github.com/latonita/esphome-nordic-uart-ble)
 
 # ESPHome BLE NUS (Nordic UART Service) Client
 
@@ -23,10 +27,10 @@ Some devices ship with alternate UUIDs (common variant):
 - RX: `6e400002-b5a3-f393-e0a9-e50e24dc4179`
 - TX: `6e400003-b5a3-f393-e0a9-e50e24dc4179`
 
-Adjust the UUIDs in YAML to match your target peripheral.
+Adjust the UUIDs in YAML to match your target peripheral if needed.
 
 
-### Migrating from wired UART to Nordic UART
+### Migrating from wired UART to Nordic UART Client
 If you already have a component using a wired UART, you can swap it to BLE NUS by pointing it to the Nordic transport:
 
 ```
@@ -44,15 +48,20 @@ ble_nus_client:
   id: ble_uart
   pin: 123456
   # optional: idle_timeout: 5min
-  # optional: autoconnect: true
+  # optional: connect_on_demand: true
 
 some_component:
   uart_id: ble_uart
 ```
 
 
-## YAML (stub)
+## YAML Configuration
 ```yaml
+external_components:
+  - source: github://latonita/esphome-nordic-uart-ble
+    refresh: 10s
+    components: [ble_nus_client]
+
 ble_nus_client:
   id: ble_uart
   pin: 123456
@@ -60,28 +69,8 @@ ble_nus_client:
   rx_uuid: 6e400002-b5a3-f393-e0a9-e50e24dcca9e
   tx_uuid: 6e400003-b5a3-f393-e0a9-e50e24dcca9e
   mtu: 247
-  idle_timeout: 0s      # optional, default disables auto-disconnect
-  autoconnect: false    # optional, auto-connect on UART access when disconnected
-
-# Example consumer (any UART-based component)
-# some_component:
-#   uart_id: ble_uart
-
-# Example session polling (pseudo)
-# Your component with update_interval: never
-# and use on_connected + action to trigger update
-interval:
-  - interval: 60s
-    then:
-      - ble_nus_client.connect: ble_uart
-
-ble_nus_client:
-  id: ble_uart
-  pin: 123456
-  on_connected:
-    - lambda: |-
-        id(my_component).update();
-    # - ble_nus_client.disconnect: ble_uart # if component only sends data/receives once in update() then you can disconnect, if its long loop() process - dont call disconnect
+  idle_timeout: 0s             # optional, default disables auto-disconnect
+  connect_on_demand: false     # optional, auto-connect on UART access when disconnected
 
 ```
 
@@ -94,18 +83,19 @@ ble_nus_client:
 - **tx_uuid** (Optional, string): NUS TX characteristic (notifications to client). Default `6e400003-b5a3-f393-e0a9-e50e24dcca9e`.
 - **mtu** (Optional, int): Desired MTU, 23–517. Default `247`.
 - **idle_timeout** (Optional, time): Auto-disconnect after no RX/TX activity. `0s` disables (default).
-- **autoconnect** (Optional, bool): If `true`, any UART access while disconnected will trigger a BLE connect attempt (once per second max). Default `false`.
+- **connect_on_demand** (Optional, bool): If `true`, any UART access while disconnected will trigger a BLE connect attempt (once per second max). Default `false`.
 - All other options from `ble_client`.
 
 ## Automations
-- `on_connected`: Fired when the BLE link reaches UART_LINK_ESTABLISHED.
-- `on_disconnected`: Fired when the BLE link closes.
+- `on_connected`: Fired when the BLE UART link established.
+- `on_disconnected`: Fired when the BLE UART link closed.
 - `on_sent`: Fired when transmission finished and confirmed by remote device.
 - `on_data`: Fired when any notification payload is received.
 
 ## Actions
 - `ble_nus_client.connect`: Initiate a BLE connection.
 - `ble_nus_client.disconnect`: Disconnect the BLE link.
+- `ble_nus_client.send`: Send data (list of bytes or string) over NUS.
 
 ### Example triggers/actions
 ```
@@ -130,4 +120,18 @@ button:
     name: "NUS Disconnect"
     on_press:
       - ble_nus_client.disconnect: ble_uart
+
+  - platform: template
+    name: "Send Hello"
+    on_press:
+      - ble_nus_client.send:
+          id: ble_uart
+          data: "Hello\n"
+
+  - platform: template
+    name: "Send Bytes"
+    on_press:
+      - ble_nus_client.send:
+          id: ble_uart
+          data: [0x01, 0x02, 0x03, 0x04, 0x05]
 ```

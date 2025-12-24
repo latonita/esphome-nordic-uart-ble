@@ -259,7 +259,7 @@ void BLENUSClientComponent::send_next_chunk_in_ble_() {
 }
 
 bool BLENUSClientComponent::maybe_autoconnect_() {
-  if (!this->autoconnect_on_access_) {
+  if (!this->connect_on_demand_) {
     return false;
   }
   if (this->state_ == FsmState::UART_LINK_ESTABLISHED || this->state_ == FsmState::CONNECTING ||
@@ -371,7 +371,7 @@ bool BLENUSClientComponent::discover_characteristics_() {
 }
 
 void BLENUSClientComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if,
-                                              esp_ble_gattc_cb_param_t *param) {
+                                                esp_ble_gattc_cb_param_t *param) {
   
   if (this->parent_ == nullptr) {
     ESP_LOGV(TAG, "gattc_event_handler called but no parent");

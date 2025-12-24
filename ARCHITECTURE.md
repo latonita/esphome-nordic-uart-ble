@@ -18,16 +18,19 @@ Transitions will be driven by BLE events (connect/discover/CCCD/MTU/notify) once
 - RX: `RingBuffer` (512 bytes) with peek cache.
 - TX: `RingBuffer` (512 bytes) to queue outgoing data (BLE fragmentation TBD).
 
-## Public API (C++)
-- `connect()` / `disconnect()`
-- `is_connected()`
+## Client (BLE NUS)
+- `connect()` / `disconnect()` / `is_connected()`
 - UART interface: `write_array`, `read_array`, `peek_byte`, `available`, `flush`
-- Optional: `autoconnect` (auto-connect when UART API is touched) and `idle_timeout` (auto-disconnect after inactivity)
-- Triggers: `on_connected`, `on_disconnected`
-- Actions: `uart_nordic.connect`, `uart_nordic.disconnect`
+- Options: `connect_on_demand` (auto-connect on UART access), `idle_timeout` (auto-disconnect after inactivity)
+- Automations: `on_connected`, `on_disconnected`, `on_sent`, `on_data`
+- Actions: `ble_nus_client.connect`, `ble_nus_client.disconnect`, `ble_nus_client.send`
+- Internals: RX/TX ring buffers (512 bytes), MTU-driven chunking (MTU-3), TX queue chained via `ESP_GATTC_WRITE_CHAR_EVT`; RX via notifications into ring buffer. Activity timestamp drives idle timeout.
 
-## Server (planned/skeleton)
-- `uart_nordic_server` will expose the same UART interface but as a BLE NUS peripheral (ESP32 as server), with UUIDs/PIN/MTU/idle-timeout/auto-advertise options and actions to start/stop advertising.
+## Server (skeleton)
+- `ble_nus_server` exposes the UART interface as a BLE NUS peripheral (ESP32 as server) with UUID/PIN/MTU/idle-timeout/auto-advertise options.
+- Automations: `on_connected`, `on_disconnected`, `on_sent`, `on_data`.
+- Actions: `ble_nus_server.start_advertising`, `ble_nus_server.stop_advertising`, `ble_nus_server.disconnect`.
+- Internals (current state): service/characteristics created via `esp32_ble_server` (RX write, TX notify+CCCD), RX writes pushed to ring buffer, TX notifications sent from buffer; idle timeout calls disconnect. Needs full advertising/security/CCCD handling to be production-ready.
 
 ## Config (Python)
 Validated UUIDs and PIN:
