@@ -50,11 +50,9 @@ class BLENUSClientComponent : public uart::UARTComponent, public ble_client::BLE
 
   // uart::UARTComponent interface
   void write_array(const uint8_t *data, size_t len) override;
-  void write_byte(uint8_t data);
-  bool read_byte(uint8_t *data);
   bool peek_byte(uint8_t *data) override;
   bool read_array(uint8_t *data, size_t len) override;
-  int available() override;
+  size_t available() override;
   void flush() override;
 
   void check_logger_conflict() override {}
@@ -114,11 +112,10 @@ class BLENUSClientComponent : public uart::UARTComponent, public ble_client::BLE
   bool peek_valid_{false};
   uint8_t peek_byte_{0};
 
-  std::vector<uint8_t> tx_queue_;
+  static constexpr size_t TX_CHUNK_MAX = 514;  // max MTU (517) - 3 bytes ATT overhead
+  std::unique_ptr<uint8_t[]> tx_chunk_buf_;
   bool tx_in_progress_{false};
   uint32_t tx_flush_timeout_ms_{2000};
-
-  int last_error_{0};
 
   uint32_t last_activity_ms_{0};
   uint32_t idle_disconnect_timeout_ms_{0};

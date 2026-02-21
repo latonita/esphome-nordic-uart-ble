@@ -62,7 +62,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_ON_SENT): automation.validate_automation(),
         cv.Optional(CONF_ON_DATA): automation.validate_automation(),
     }
-).extend(ble_client.BLE_CLIENT_SCHEMA)
+).extend(cv.COMPONENT_SCHEMA).extend(ble_client.BLE_CLIENT_SCHEMA)
 
 
 async def to_code(config):

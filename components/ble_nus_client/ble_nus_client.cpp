@@ -10,6 +10,7 @@ static const char *const TAG = "ble_nus_client";
 void BLENUSClientComponent::setup() {
   this->rx_buffer_ = esphome::RingBuffer::create(RX_BUFFER_CAPACITY);
   this->tx_buffer_ = esphome::RingBuffer::create(TX_BUFFER_CAPACITY);
+  this->tx_chunk_buf_ = std::make_unique<uint8_t[]>(TX_CHUNK_MAX);
   this->peek_valid_ = false;
   this->set_state_(FsmState::IDLE);
 }
@@ -121,10 +122,6 @@ void BLENUSClientComponent::write_array(const uint8_t *data, size_t len) {
   }
 }
 
-void BLENUSClientComponent::write_byte(uint8_t data) { this->write_array(&data, 1); }
-
-bool BLENUSClientComponent::read_byte(uint8_t *data) { return this->read_array(data, 1); }
-
 bool BLENUSClientComponent::peek_byte(uint8_t *data) {
   if (this->state_ != FsmState::UART_LINK_ESTABLISHED) {
     this->maybe_autoconnect_();
@@ -161,34 +158,31 @@ bool BLENUSClientComponent::read_array(uint8_t *data, size_t len) {
   if (data == nullptr || len == 0) {
     return true;
   }
-  size_t remaining = len;
-  size_t offset = 0;
+  size_t from_peek = this->peek_valid_ ? 1 : 0;
+  size_t from_buffer = len - from_peek;
 
-  if (this->peek_valid_) {
-    data[0] = this->peek_byte_;
-    this->peek_valid_ = false;
-    remaining--;
-    offset = 1;
-  }
-
-  if (remaining == 0) {
-    return true;
-  }
-
-  if (this->rx_buffer_ == nullptr || this->rx_buffer_->available() < remaining) {
-    // restore peek_valid_? we already consumed it; treat as failure but keep consumed byte
+  // check availability before consuming anything — keeps the operation atomic
+  if (from_buffer > 0 && (this->rx_buffer_ == nullptr || this->rx_buffer_->available() < from_buffer)) {
     return false;
   }
 
-  size_t read = this->rx_buffer_->read(data + offset, remaining, 0);
-  if (read == remaining) {
-    this->last_activity_ms_ = millis();
-    return true;
+  if (from_peek) {
+    data[0] = this->peek_byte_;
+    this->peek_valid_ = false;
   }
-  return false;
+
+  if (from_buffer > 0) {
+    size_t read = this->rx_buffer_->read(data + from_peek, from_buffer, 0);
+    if (read < from_buffer) {
+      return false;
+    }
+  }
+
+  this->last_activity_ms_ = millis();
+  return true;
 }
 
-int BLENUSClientComponent::available() {
+size_t BLENUSClientComponent::available() {
   if (this->state_ != FsmState::UART_LINK_ESTABLISHED) {
     this->maybe_autoconnect_();
   }
@@ -241,8 +235,8 @@ void BLENUSClientComponent::send_next_chunk_in_ble_() {
   this->last_activity_ms_ = millis();
 
   size_t max_payload = this->mtu_ > 3 ? (this->mtu_ - 3) : 20;
-  std::vector<uint8_t> chunk(std::min(pending, max_payload));
-  size_t pulled = this->tx_buffer_->read(chunk.data(), chunk.size(), 0);
+  size_t chunk_size = std::min(pending, max_payload);
+  size_t pulled = this->tx_buffer_->read(this->tx_chunk_buf_.get(), chunk_size, 0);
   if (pulled == 0) {
     this->tx_in_progress_ = false;
     return;
@@ -250,8 +244,8 @@ void BLENUSClientComponent::send_next_chunk_in_ble_() {
 
   esp_err_t err =
       esp_ble_gattc_write_char(this->parent_->get_gattc_if(), this->parent_->get_conn_id(), this->chr_commands_handle_,
-                               pulled, chunk.data(), ESP_GATT_WRITE_TYPE_RSP, ESP_GATT_AUTH_REQ_NONE);
-  ESP_LOGVV(TAG, "TX: %s", format_hex_pretty(chunk.data(), pulled).c_str());
+                               pulled, this->tx_chunk_buf_.get(), ESP_GATT_WRITE_TYPE_RSP, ESP_GATT_AUTH_REQ_NONE);
+  ESP_LOGVV(TAG, "TX: %s", format_hex_pretty(this->tx_chunk_buf_.get(), pulled).c_str());
   if (err != ESP_OK) {
     ESP_LOGW(TAG, "Failed to write TX characteristic: %d", err);
     this->tx_in_progress_ = false;
