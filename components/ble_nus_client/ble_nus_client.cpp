@@ -235,7 +235,7 @@ void BLENUSClientComponent::send_next_chunk_in_ble_() {
   this->last_activity_ms_ = millis();
 
   size_t max_payload = this->mtu_ > 3 ? (this->mtu_ - 3) : 20;
-  size_t chunk_size = std::min(pending, max_payload);
+  size_t chunk_size = std::min({pending, max_payload, TX_CHUNK_MAX});
   size_t pulled = this->tx_buffer_->read(this->tx_chunk_buf_.get(), chunk_size, 0);
   if (pulled == 0) {
     this->tx_in_progress_ = false;
