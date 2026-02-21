@@ -372,7 +372,7 @@ void BLENUSClientComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_
     return;
   }
 
-  ESP_LOGI(TAG, "GATTC event: %d", event);
+  ESP_LOGV(TAG, "GATTC event: %d", event);
   
   // if (event == ESP_GATTC_OPEN_EVT) {
   //   if (!this->parent_->check_addr(param->open.remote_bda))
