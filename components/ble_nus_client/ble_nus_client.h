@@ -14,8 +14,7 @@
 
 #include "esphome/core/ring_buffer.h"
 
-namespace esphome {
-namespace ble_nus_client {
+namespace esphome::ble_nus_client {
 
 namespace espbt = esphome::esp32_ble_tracker;
 
@@ -130,7 +129,6 @@ class BLENUSClientComponent : public uart::UARTComponent, public ble_client::BLE
   espbt::ESPBTUUID rx_uuid_for_commands_;
   espbt::ESPBTUUID tx_uuid_for_responses_;
   uint32_t passkey_{0};
-  int8_t rssi_{0};
 };
 
 class BLENUSClientConnectAction : public Action<> {
@@ -164,5 +162,4 @@ class BLENUSClientSendAction : public Action<> {
   std::vector<uint8_t> data_;
 };
 
-}  // namespace ble_nus_client
-}  // namespace esphome
+}  // namespace esphome::ble_nus_client

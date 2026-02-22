@@ -2,8 +2,7 @@
 
 #include "esphome/core/log.h"
 
-namespace esphome {
-namespace ble_nus_client {
+namespace esphome::ble_nus_client {
 
 static const char *const TAG = "ble_nus_client";
 
@@ -351,9 +350,6 @@ bool BLENUSClientComponent::discover_characteristics_() {
   this->chr_responses_handle_ = chr_responses->handle;
 
   auto desc = this->parent_->get_config_descriptor(this->chr_responses_handle_);
-
-  // auto desc = this->parent_->get_descriptor(this->service_uuid_, this->tx_uuid_,
-  //                                           espbt::ESPBTUUID::from_uint16(ESP_GATT_UUID_CHAR_CLIENT_CONFIG));
   if (desc == nullptr) {
     ESP_LOGW(TAG, "No CCCD descriptor found for TX characteristic");
     return false;
@@ -374,14 +370,6 @@ void BLENUSClientComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_
 
   ESP_LOGV(TAG, "GATTC event: %d", event);
   
-  // if (event == ESP_GATTC_OPEN_EVT) {
-  //   if (!this->parent_->check_addr(param->open.remote_bda))
-  //     return;
-  // } else {
-  //   if (param->cfg_mtu.conn_id != 0 && param->cfg_mtu.conn_id != this->parent_->get_conn_id() &&
-  //       event != ESP_GATTC_DISCONNECT_EVT)
-  //     return;
-  // }
   switch (event) {
     case ESP_GATTC_OPEN_EVT: {
       if (param->open.status == ESP_GATT_OK) {
@@ -555,7 +543,6 @@ void BLENUSClientComponent::gap_event_handler(esp_gap_ble_cb_event_t event, esp_
       if (!this->parent_->check_addr(param->read_rssi_cmpl.remote_addr)) {
         break;
       }
-      this->rssi_ = param->read_rssi_cmpl.rssi;
       if (this->ble_defer_fn_ != nullptr) {
         auto fn = this->ble_defer_fn_;
         this->ble_defer_fn_ = nullptr;
@@ -568,5 +555,4 @@ void BLENUSClientComponent::gap_event_handler(esp_gap_ble_cb_event_t event, esp_
   }
 }
 
-}  // namespace ble_nus_client
-}  // namespace esphome
+}  // namespace esphome::ble_nus_client
