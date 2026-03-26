@@ -198,7 +198,7 @@ size_t BLENUSClientComponent::available() {
   return this->rx_buffer_->available() + (this->peek_valid_ ? 1 : 0);
 }
 
-void BLENUSClientComponent::flush() {
+uart::FlushResult BLENUSClientComponent::flush() {
   if (this->state_ != FsmState::UART_LINK_ESTABLISHED) {
     this->maybe_autoconnect_();
   }
@@ -209,8 +209,8 @@ void BLENUSClientComponent::flush() {
                this->tx_buffer_ != nullptr ? this->tx_buffer_->available() : 0);
       break;
     }
-    delay(5);
-    yield();
+    //delay(5);
+    return uart::FlushResult::SUCCESS;
   }
 }
 
