@@ -12,7 +12,7 @@
 #include <vector>
 #include <functional>
 
-#include "esphome/components/ring_buffer.h"
+//#include "esphome/components/ring_buffer.h"
 
 namespace esphome {
 namespace ble_nus_client {
