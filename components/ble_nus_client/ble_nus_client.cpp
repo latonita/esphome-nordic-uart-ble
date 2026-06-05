@@ -182,14 +182,14 @@ bool BLENUSClientComponent::read_array(uint8_t *data, size_t len) {
   return true;
 }
 
-size_t BLENUSClientComponent::available() {
+int BLENUSClientComponent::available() {
   if (this->state_ != FsmState::UART_LINK_ESTABLISHED) {
     this->maybe_autoconnect_();
   }
   if (this->rx_buffer_ == nullptr) {
     return 0;
   }
-  return this->rx_buffer_->available() + (this->peek_valid_ ? 1 : 0);
+  return static_cast<int>(this->rx_buffer_->available() + (this->peek_valid_ ? 1 : 0));
 }
 
 uart::UARTFlushResult BLENUSClientComponent::flush() {
