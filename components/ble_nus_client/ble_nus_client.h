@@ -2,7 +2,13 @@
 
 #include "esphome/core/component.h"
 #include "esphome/components/ble_client/ble_client.h"
-#include "esphome/components/uart/uart_component.h"
+#ifdef USE_ESP32
+#include "esphome/components/uart/uart_component_esp_idf.h"
+#endif
+#ifdef USE_ESP8266
+#include "esphome/components/uart/uart_component_esp8266.h"
+#endif
+//#include "esphome/components/uart/uart_component.h"
 #include "esphome/components/esp32_ble_tracker/esp32_ble_tracker.h"
 #include "esphome/core/automation.h"
 #include "esp_gatt_defs.h"
