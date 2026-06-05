@@ -19,7 +19,7 @@ namespace ble_nus_client {
 
 namespace espbt = esphome::esp32_ble_tracker;
 
-class BLENUSClientComponent : public uart::UARTComponent, public ble_client::BLEClientNode, public Component {
+class BLENUSClientComponent : public uart::IDFUARTComponent, public ble_client::BLEClientNode, public Component {
  public:
   enum class FsmState : uint8_t {
     IDLE,
