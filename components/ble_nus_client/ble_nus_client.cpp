@@ -8,8 +8,8 @@ namespace ble_nus_client {
 static const char *const TAG = "ble_nus_client";
 
 void BLENUSClientComponent::setup() {
-  this->rx_buffer_ = esphome::RingBuffer::create(RX_BUFFER_CAPACITY);
-  this->tx_buffer_ = esphome::RingBuffer::create(TX_BUFFER_CAPACITY);
+  this->rx_buffer_ = esphome::ring_buffer::RingBuffer::create(RX_BUFFER_CAPACITY);
+  this->tx_buffer_ = esphome::ring_buffer::RingBuffer::create(TX_BUFFER_CAPACITY);
   this->peek_valid_ = false;
   this->set_state_(FsmState::IDLE);
 }
