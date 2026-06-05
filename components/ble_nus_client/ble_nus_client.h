@@ -55,7 +55,7 @@ class BLENUSClientComponent : public uart::UARTComponent, public ble_client::BLE
   bool peek_byte(uint8_t *data) override;
   bool read_array(uint8_t *data, size_t len) override;
   size_t available() override;
-  uart::FlushResult flush() override;
+  uart::UARTFlushResult flush() override;
 
   void check_logger_conflict() override {}
 
@@ -105,10 +105,10 @@ class BLENUSClientComponent : public uart::UARTComponent, public ble_client::BLE
   uint16_t chr_cccd_handle_{0};
 
   static constexpr size_t RX_BUFFER_CAPACITY = 512;
-  std::unique_ptr<esphome::RingBuffer> rx_buffer_;
+  std::unique_ptr<esphome::ring_buffer::RingBuffer> rx_buffer_;
 
   static constexpr size_t TX_BUFFER_CAPACITY = 512;
-  std::unique_ptr<esphome::RingBuffer> tx_buffer_;
+  std::unique_ptr<esphome::ring_buffer::RingBuffer> tx_buffer_;
 
   // single-byte peek cache
   bool peek_valid_{false};
