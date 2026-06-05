@@ -209,7 +209,7 @@ uart::UARTFlushResult BLENUSClientComponent::flush() {
                this->tx_buffer_ != nullptr ? this->tx_buffer_->available() : 0);
       break;
     }
-    //delay(5);
+    delay(5);
     return uart::UARTFlushResult::UART_FLUSH_RESULT_SUCCESS;
   }
   return uart::UARTFlushResult::UART_FLUSH_RESULT_ASSUMED_SUCCESS;
