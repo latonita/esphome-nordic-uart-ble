@@ -212,6 +212,7 @@ uart::UARTFlushResult BLENUSClientComponent::flush() {
     //delay(5);
     return uart::UARTFlushResult::UART_FLUSH_RESULT_SUCCESS;
   }
+  return uart::UARTFlushResult::UART_FLUSH_RESULT_ASSUMED_SUCCESS;
 }
 
 void BLENUSClientComponent::set_state_(FsmState state) {
