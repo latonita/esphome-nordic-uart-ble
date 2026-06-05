@@ -12,7 +12,7 @@
 namespace esphome {
 namespace ble_nus_server {
 
-class BLENUSServerComponent : public uart::UARTComponent, public Component {
+class BLENUSServerComponent : public uart::IDFUARTComponent, public Component {
  public:
   void setup() override;
   void loop() override;
