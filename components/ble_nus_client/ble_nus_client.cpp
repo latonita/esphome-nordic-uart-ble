@@ -210,7 +210,7 @@ uart::UARTFlushResult BLENUSClientComponent::flush() {
       break;
     }
     //delay(5);
-    return uart::FlushResult::SUCCESS;
+    return uart::UARTFlushResult::UART_FLUSH_RESULT_SUCCESS;
   }
 }
 
