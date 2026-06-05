@@ -207,11 +207,13 @@ uart::UARTFlushResult BLENUSClientComponent::flush() {
     if (millis() - start > this->tx_flush_timeout_ms_) {
       ESP_LOGW(TAG, "Flush timeout (%u ms) with %zu bytes pending", this->tx_flush_timeout_ms_,
                this->tx_buffer_ != nullptr ? this->tx_buffer_->available() : 0);
-      break;
+      //break;
+      return uart::UARTFlushResult::UART_FLUSH_RESULT_TIMEOUT;
     }
     //delay(5);
-    return uart::UARTFlushResult::UART_FLUSH_RESULT_SUCCESS;
+    //return uart::UARTFlushResult::UART_FLUSH_RESULT_SUCCESS;
   }
+  return uart::UARTFlushResult::UART_FLUSH_RESULT_SUCCESS;
 }
 
 void BLENUSClientComponent::set_state_(FsmState state) {
