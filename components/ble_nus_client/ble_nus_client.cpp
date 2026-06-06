@@ -163,6 +163,7 @@ bool BLENUSClientComponent::read_array(uint8_t *data, size_t len) {
 
   // check availability before consuming anything — keeps the operation atomic
   if (from_buffer > 0 && (this->rx_buffer_ == nullptr || this->rx_buffer_->available() < from_buffer)) {
+    ESP_LOGE(TAG, "RX check availability before consuming ");
     return false;
   }
 
@@ -174,6 +175,7 @@ bool BLENUSClientComponent::read_array(uint8_t *data, size_t len) {
   if (from_buffer > 0) {
     size_t read = this->rx_buffer_->read(data + from_peek, from_buffer, 0);
     if (read < from_buffer) {
+      ESP_LOGE(TAG, "RX read < from_buffer");
       return false;
     }
   }
