@@ -19,8 +19,8 @@ SEND_ACTION = "ble_nus_client.send"
 CONF_IDLE_TIMEOUT = "idle_timeout"
 CONF_CONNECT_ON_DEMAND = "connect_on_demand"
 
-DEPENDENCIES = ["uart", "ble_client"]
-AUTO_LOAD = ["uart", "ble_client"]
+DEPENDENCIES = ["uart", "ble_client", "ring_buffer"]
+AUTO_LOAD = ["uart", "ble_client", "ring_buffer"]
 
 CONF_TX_UUID = "tx_uuid"
 CONF_RX_UUID = "rx_uuid"
@@ -62,7 +62,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_ON_SENT): automation.validate_automation(),
         cv.Optional(CONF_ON_DATA): automation.validate_automation(),
     }
-).extend(ble_client.BLE_CLIENT_SCHEMA)
+).extend(cv.COMPONENT_SCHEMA).extend(ble_client.BLE_CLIENT_SCHEMA)
 
 
 async def to_code(config):
@@ -95,13 +95,13 @@ async def to_code(config):
             await automation.build_automation(var.get_on_data_trigger(), [], conf)
 
 
-@automation.register_action(CONNECT_ACTION, BLENUSClientConnectAction, automation.maybe_simple_id({cv.GenerateID(): cv.use_id(BLENUSClientComponent)}))
+@automation.register_action(CONNECT_ACTION, BLENUSClientConnectAction, automation.maybe_simple_id({cv.GenerateID(): cv.use_id(BLENUSClientComponent)}), synchronous=False)
 async def ble_nus_client_connect_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, paren)
 
 
-@automation.register_action(DISCONNECT_ACTION, BLENUSClientDisconnectAction, automation.maybe_simple_id({cv.GenerateID(): cv.use_id(BLENUSClientComponent)}))
+@automation.register_action(DISCONNECT_ACTION, BLENUSClientDisconnectAction, automation.maybe_simple_id({cv.GenerateID(): cv.use_id(BLENUSClientComponent)}), synchronous=False)
 async def ble_nus_client_disconnect_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, paren)
@@ -115,7 +115,7 @@ SEND_SCHEMA = cv.Schema(
 )
 
 
-@automation.register_action(SEND_ACTION, BLENUSClientSendAction, SEND_SCHEMA)
+@automation.register_action(SEND_ACTION, BLENUSClientSendAction, SEND_SCHEMA, synchronous=True)
 async def ble_nus_client_send_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     data = config["data"]

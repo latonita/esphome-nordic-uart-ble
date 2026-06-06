@@ -2,7 +2,8 @@
 
 #include "esphome/core/component.h"
 #include "esphome/components/ble_client/ble_client.h"
-#include "esphome/components/uart/uart_component.h"
+#include "esphome/components/uart/uart.h"
+//#include "esphome/components/uart/uart_component_esp_idf.h"
 #include "esphome/components/esp32_ble_tracker/esp32_ble_tracker.h"
 #include "esphome/core/automation.h"
 #include "esp_gatt_defs.h"
@@ -12,7 +13,7 @@
 #include <vector>
 #include <functional>
 
-#include "esphome/core/ring_buffer.h"
+#include "esphome/components/ring_buffer/ring_buffer.h"
 
 namespace esphome {
 namespace ble_nus_client {
@@ -50,12 +51,10 @@ class BLENUSClientComponent : public uart::UARTComponent, public ble_client::BLE
 
   // uart::UARTComponent interface
   void write_array(const uint8_t *data, size_t len) override;
-  void write_byte(uint8_t data);
-  bool read_byte(uint8_t *data);
   bool peek_byte(uint8_t *data) override;
   bool read_array(uint8_t *data, size_t len) override;
   size_t available() override;
-  uart::FlushResult flush() override;
+  uart::UARTFlushResult flush() override;
 
   void check_logger_conflict() override {}
 
@@ -105,20 +104,19 @@ class BLENUSClientComponent : public uart::UARTComponent, public ble_client::BLE
   uint16_t chr_cccd_handle_{0};
 
   static constexpr size_t RX_BUFFER_CAPACITY = 512;
-  std::unique_ptr<esphome::RingBuffer> rx_buffer_;
+  std::unique_ptr<esphome::ring_buffer::RingBuffer> rx_buffer_;
 
   static constexpr size_t TX_BUFFER_CAPACITY = 512;
-  std::unique_ptr<esphome::RingBuffer> tx_buffer_;
+  std::unique_ptr<esphome::ring_buffer::RingBuffer> tx_buffer_;
 
   // single-byte peek cache
   bool peek_valid_{false};
   uint8_t peek_byte_{0};
 
-  std::vector<uint8_t> tx_queue_;
+  static constexpr size_t TX_CHUNK_MAX = 514;  // max MTU (517) - 3 bytes ATT overhead
+  std::unique_ptr<uint8_t[]> tx_chunk_buf_;
   bool tx_in_progress_{false};
   uint32_t tx_flush_timeout_ms_{2000};
-
-  int last_error_{0};
 
   uint32_t last_activity_ms_{0};
   uint32_t idle_disconnect_timeout_ms_{0};
