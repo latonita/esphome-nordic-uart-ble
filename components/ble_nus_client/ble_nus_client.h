@@ -2,8 +2,8 @@
 
 #include "esphome/core/component.h"
 #include "esphome/components/ble_client/ble_client.h"
-//#include "esphome/components/uart/uart_component.h"
-#include "esphome/components/uart/uart_component_esp_idf.h"
+#include "esphome/components/uart/uart_component.h"
+//#include "esphome/components/uart/uart_component_esp_idf.h"
 #include "esphome/components/esp32_ble_tracker/esp32_ble_tracker.h"
 #include "esphome/core/automation.h"
 #include "esp_gatt_defs.h"
@@ -20,7 +20,7 @@ namespace ble_nus_client {
 
 namespace espbt = esphome::esp32_ble_tracker;
 
-class BLENUSClientComponent : public uart::UARTComponent, public ble_client::BLEClientNode {
+class BLENUSClientComponent : public uart::UARTComponent, public ble_client::BLEClientNode, public Component {
  public:
   enum class FsmState : uint8_t {
     IDLE,
