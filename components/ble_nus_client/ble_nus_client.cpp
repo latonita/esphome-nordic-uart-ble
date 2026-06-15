@@ -8,8 +8,8 @@ namespace ble_nus_client {
 static const char *const TAG = "ble_nus_client";
 
 void BLENUSClientComponent::setup() {
-  this->rx_buffer_ = esphome::RingBuffer::create(RX_BUFFER_CAPACITY);
-  this->tx_buffer_ = esphome::RingBuffer::create(TX_BUFFER_CAPACITY);
+  this->rx_buffer_ = esphome::ring_buffer::RingBuffer::create(RX_BUFFER_CAPACITY);
+  this->tx_buffer_ = esphome::ring_buffer::RingBuffer::create(TX_BUFFER_CAPACITY);
   this->peek_valid_ = false;
   this->set_state_(FsmState::IDLE);
 }
@@ -198,7 +198,7 @@ size_t BLENUSClientComponent::available() {
   return this->rx_buffer_->available() + (this->peek_valid_ ? 1 : 0);
 }
 
-uart::FlushResult BLENUSClientComponent::flush() {
+uart::UARTFlushResult BLENUSClientComponent::flush() {
   if (this->state_ != FsmState::UART_LINK_ESTABLISHED) {
     this->maybe_autoconnect_();
   }
@@ -210,7 +210,7 @@ uart::FlushResult BLENUSClientComponent::flush() {
       break;
     }
     //delay(5);
-    return uart::FlushResult::SUCCESS;
+    return uart::UARTFlushResult::UART_FLUSH_RESULT_SUCCESS;
   }
 }
 
