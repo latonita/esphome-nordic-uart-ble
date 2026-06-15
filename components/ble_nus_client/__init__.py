@@ -20,7 +20,7 @@ CONF_IDLE_TIMEOUT = "idle_timeout"
 CONF_CONNECT_ON_DEMAND = "connect_on_demand"
 
 DEPENDENCIES = ["uart", "ble_client"]
-AUTO_LOAD = ["uart", "ble_client"]
+AUTO_LOAD = ["uart", "ble_client", "ring_buffer"]
 
 CONF_TX_UUID = "tx_uuid"
 CONF_RX_UUID = "rx_uuid"
