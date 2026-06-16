@@ -95,13 +95,13 @@ async def to_code(config):
             await automation.build_automation(var.get_on_data_trigger(), [], conf)
 
 
-@automation.register_action(CONNECT_ACTION, BLENUSClientConnectAction, automation.maybe_simple_id({cv.GenerateID(): cv.use_id(BLENUSClientComponent)}))
+@automation.register_action(CONNECT_ACTION, BLENUSClientConnectAction, automation.maybe_simple_id({cv.GenerateID(): cv.use_id(BLENUSClientComponent)}), synchronous=True)
 async def ble_nus_client_connect_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, paren)
 
 
-@automation.register_action(DISCONNECT_ACTION, BLENUSClientDisconnectAction, automation.maybe_simple_id({cv.GenerateID(): cv.use_id(BLENUSClientComponent)}))
+@automation.register_action(DISCONNECT_ACTION, BLENUSClientDisconnectAction, automation.maybe_simple_id({cv.GenerateID(): cv.use_id(BLENUSClientComponent)}), synchronous=True)
 async def ble_nus_client_disconnect_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, paren)
@@ -115,7 +115,7 @@ SEND_SCHEMA = cv.Schema(
 )
 
 
-@automation.register_action(SEND_ACTION, BLENUSClientSendAction, SEND_SCHEMA)
+@automation.register_action(SEND_ACTION, BLENUSClientSendAction, SEND_SCHEMA, synchronous=True)
 async def ble_nus_client_send_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     data = config["data"]

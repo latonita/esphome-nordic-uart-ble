@@ -379,7 +379,7 @@ void BLENUSClientComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_
     return;
   }
 
-  ESP_LOGI(TAG, "GATTC event: %d", event);
+  ESP_LOGV(TAG, "GATTC event: %d", event);
   
   // if (event == ESP_GATTC_OPEN_EVT) {
   //   if (!this->parent_->check_addr(param->open.remote_bda))
@@ -401,7 +401,7 @@ void BLENUSClientComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_
     case ESP_GATTC_CFG_MTU_EVT: {
       if (param->cfg_mtu.status == ESP_GATT_OK) {
         this->mtu_ = param->cfg_mtu.mtu;
-        ESP_LOGI(TAG, "MTU configured: %u", this->mtu_);
+        ESP_LOGD(TAG, "MTU configured: %u", this->mtu_);
       } else {
         ESP_LOGW(TAG, "MTU config failed: %d", param->cfg_mtu.status);
       }
@@ -459,7 +459,7 @@ void BLENUSClientComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_
           this->notifications_enabled_ = true;
           ESP_LOGI(TAG, "Notifications enabled (CCCD write ok)");
         } else {
-          ESP_LOGI(TAG, "ESP_GATTC_WRITE_DESCR_EVT not for CCCD.. (handle = %u)", param->write.handle);
+          ESP_LOGD(TAG, "ESP_GATTC_WRITE_DESCR_EVT not for CCCD.. (handle = %u)", param->write.handle);
         }
       } else {
         ESP_LOGW(TAG, "CCCD write failed: status=%d", param->write.status);
